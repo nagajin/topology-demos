@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>第3章 位相空間 — ε–δ で連続性を見る</title>
+<style>
+  :root { --bg:#0e1116; --panel:#161b22; --panel2:#1c232d; --border:#2a323d;
+          --text:#d6dde6; --muted:#8b97a6; --accent:#4ea1ff; --accent2:#ffb454;
+          --cEps:#ef6a6a; --cDel:#5ad19a; --cCurve:#cfe0f4; --cPoint:#ffd24a; --cBad:#ff8a4c; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; height:100%; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; }
+  #app { display:flex; height:100vh; overflow:hidden; }
+  #stage { flex:1; position:relative; min-width:0; }
+  canvas { display:block; width:100%; height:100%; background:radial-gradient(circle at 50% 45%,#131a24 0%,#0e1116 72%); cursor:crosshair; }
+  #sidebar { width:340px; flex:0 0 340px; background:var(--panel); border-left:1px solid var(--border);
+    overflow-y:auto; padding:14px 16px 40px; font-size:13px; }
+  h1 { font-size:15px; margin:0 0 2px; }
+  .nav { font-size:11px; margin:0 0 10px; }
+  .nav a { color:var(--accent); text-decoration:none; }
+  .nav a:hover { text-decoration:underline; }
+  .sub { color:var(--muted); font-size:11.5px; margin:0 0 12px; line-height:1.5; }
+  .group { background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:12px; }
+  .group h2 { font-size:12px; margin:0 0 10px; color:var(--accent); font-weight:600; }
+  .funcGrid { display:grid; grid-template-columns:1fr; gap:5px; }
+  .funcGrid button { background:#233040; color:var(--text); border:1px solid var(--border); border-radius:7px;
+    padding:7px 9px; font-size:12px; cursor:pointer; font-family:inherit; text-align:left; }
+  .funcGrid button:hover { background:#2c3c50; }
+  .funcGrid button.active { background:var(--accent); color:#05101e; border-color:var(--accent); font-weight:600; }
+  label.row { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:9px 0; }
+  label.row span.lab { color:var(--muted); flex:0 0 auto; min-width:64px; }
+  label.row span.val { color:var(--text); font-variant-numeric:tabular-nums; min-width:54px; text-align:right; }
+  input[type=range] { flex:1; accent-color:var(--accent); }
+  .check { display:flex; align-items:center; gap:8px; margin:7px 0; cursor:pointer; }
+  .check input { accent-color:var(--accent); width:15px; height:15px; }
+  .legendRow { display:flex; align-items:center; gap:6px; font-size:11.5px; margin:4px 0; color:var(--muted); }
+  .sw { width:14px; height:14px; border-radius:3px; display:inline-block; }
+  .hint { color:var(--muted); font-size:11.5px; line-height:1.6; }
+  .hint b { color:var(--text); }
+  .res { font-variant-numeric:tabular-nums; line-height:1.7; }
+  .res .row { display:flex; justify-content:space-between; }
+  .res .row span:first-child { color:var(--muted); }
+  .res .ok { color:var(--cDel); font-weight:600; }
+  .res .bad { color:var(--cBad); font-weight:600; }
+  code { background:#0e1116; padding:1px 6px; border-radius:4px; color:var(--accent2); font-size:11.5px; }
+  #status { position:absolute; top:14px; left:16px; font-size:12px; color:var(--muted);
+    background:rgba(14,17,22,.7); padding:6px 10px; border-radius:8px; border:1px solid var(--border);
+    pointer-events:none; backdrop-filter:blur(4px); }
+  #status b { color:var(--accent2); }
+  #help { position:absolute; bottom:12px; left:16px; font-size:11px; color:var(--muted);
+    background:rgba(14,17,22,.6); padding:5px 9px; border-radius:7px; pointer-events:none; }
+  #verdict { position:absolute; top:14px; right:16px; font-size:12.5px; font-weight:600;
+    background:rgba(14,17,22,.75); padding:7px 12px; border-radius:8px; border:1px solid var(--border);
+    pointer-events:none; backdrop-filter:blur(4px); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="status">x₀ = <b id="st-x">0.50</b> &nbsp;/&nbsp; ε = <b id="st-e">0.40</b> &nbsp;/&nbsp; δ = <b id="st-d">—</b></div>
+    <div id="verdict">—</div>
+    <div id="help">グラフをクリック / ドラッグで x₀ を設定。スライダで ε を変えると δ が再計算されます。</div>
+  </div>
+  <div id="sidebar">
+    <h1>第3章 — ε–δ で連続性</h1>
+    <p class="nav">▸ <a href="index.html">索引へ戻る</a></p>
+    <p class="sub">関数 f が点 x₀ で連続 ⇔ 任意の ε &gt; 0 に対し、ある δ &gt; 0 が存在して、<br>|x − x₀| &lt; δ &nbsp;⇒&nbsp; |f(x) − f(x₀)| &lt; ε。<br>各 ε に対し、条件を満たす最大の δ を数値的に求めて可視化します。</p>
+
+    <div class="group">
+      <h2>関数を選ぶ</h2>
+      <div class="funcGrid" id="funcs"></div>
+    </div>
+
+    <div class="group">
+      <h2>パラメータ</h2>
+      <label class="row"><span class="lab">点 x₀</span>
+        <input id="x" type="range" min="-2.5" max="2.5" step="0.001" value="0.5">
+        <span class="val" id="x-v">0.500</span></label>
+      <label class="row"><span class="lab">幅 ε</span>
+        <input id="e" type="range" min="0.05" max="1.50" step="0.01" value="0.40">
+        <span class="val" id="e-v">0.40</span></label>
+    </div>
+
+    <div class="group">
+      <h2>結果</h2>
+      <div class="res">
+        <div class="row"><span>f(x₀)</span><span id="r-fx">—</span></div>
+        <div class="row"><span>取れた δ</span><span id="r-d">—</span></div>
+        <div class="row"><span>判定</span><span id="r-v">—</span></div>
+      </div>
+      <div class="legendRow" style="margin-top:8px"><span class="sw" style="background:rgba(239,106,106,0.30)"></span> ε 帯 (値の許容範囲)</div>
+      <div class="legendRow"><span class="sw" style="background:rgba(90,209,154,0.30)"></span> δ 帯 (条件を満たす近傍)</div>
+      <div class="legendRow"><span class="sw" style="background:#ffd24a"></span> (x₀, f(x₀))</div>
+    </div>
+
+    <div class="group">
+      <h2>読み方のヒント</h2>
+      <p class="hint">δ が見つかれば <b style="color:var(--cDel)">緑色の縦帯</b> が点 x₀ の左右に現れます。連続な点では ε を小さくしても δ も小さく取り直せます。
+      不連続な点では、δ をいくらでも小さくしても f の値が ε 帯を飛び出すため、<b style="color:var(--cBad)">δ が取れません</b>。
+      下の例で「跳び」「無限大」「振動」「孤立した値の付け替え」など、不連続のパターンを比べてみてください。</p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+//==================================================================
+// 第3章 ε–δ 連続性ビジュアライザ
+//==================================================================
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+
+const S = {
+  funcKey: 'x2',
+  x0: 0.5,
+  eps: 0.40,
+  view: { xMin:-3, xMax:3, yMin:-2.5, yMax:2.5, sx:0, sy:0, ox:0, oy:0 },
+  dragging: false,
+};
+
+//---------------- 関数群 ----------------
+const FUNCS = [
+  { key:'x2',     name:'f(x) = x² (連続)',                        f: x => x*x,                              type:'smooth' },
+  { key:'cubic',  name:'f(x) = x³ − x (連続)',                    f: x => x*x*x - x,                        type:'smooth' },
+  { key:'wiggle', name:'f(x) = sin(3x) + 0.3x (連続)',             f: x => Math.sin(3*x) + 0.3*x,            type:'smooth' },
+  { key:'abs',    name:'f(x) = |x| (連続・x=0で滑らかでない)',     f: x => Math.abs(x),                      type:'smooth' },
+  { key:'step',   name:'f(x) = sign(x) (x=0 で跳び不連続)',        f: x => x<0?-1:(x>0?1:0),                 type:'step',  jumps:[0] },
+  { key:'inv',    name:'f(x) = 1/x (x=0 で発散)',                  f: x => 1/x,                              type:'gap',   gaps:[0] },
+  { key:'sin1x',  name:'f(x) = sin(1/x), f(0)=0 (x=0 で振動)',     f: x => x===0?0:Math.sin(1/x),            type:'osc',   osc:[0] },
+  { key:'jump0',  name:'f(x)=x (x≠0), f(0)=1 (孤立した付け替え)',  f: x => x===0?1:x,                        type:'point', pointFix:[[0,1]] },
+];
+const FUNC_BY_KEY = Object.fromEntries(FUNCS.map(f=>[f.key,f]));
+
+//---------------- δ の計算（数値的探索） ----------------
+function computeDelta(f, x0, eps){
+  const yc = f(x0);
+  if (!isFinite(yc)) return { delta: 0, dLeft: 0, dRight: 0, reason: 'f(x₀) が定義されない', bad:true };
+  const dx = 0.0005;            // 探索の刻み（細かいほど精密）
+  const maxSteps = 6000;        // 最大 dx*6000 = 3.0
+  let dLeft = Infinity, dRight = Infinity;
+  for (let i=1; i<=maxSteps; i++){
+    const xL = x0 - i*dx, fL = f(xL);
+    if (!isFinite(fL) || Math.abs(fL - yc) >= eps){ dLeft = i*dx; break; }
+  }
+  for (let i=1; i<=maxSteps; i++){
+    const xR = x0 + i*dx, fR = f(xR);
+    if (!isFinite(fR) || Math.abs(fR - yc) >= eps){ dRight = i*dx; break; }
+  }
+  const delta = Math.min(dLeft, dRight);
+  // 振動で常に近傍内に収まることもある（連続点）— 上限切り捨て
+  return { delta: Math.min(delta, 3.0), dLeft, dRight, bad: delta <= 2*dx };
+}
+
+//---------------- 座標変換 ----------------
+function resize(){
+  const r = cv.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio||1;
+  cv.width = Math.floor(r.width*dpr); cv.height = Math.floor(r.height*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const v = S.view;
+  v.sx = r.width / (v.xMax - v.xMin);
+  v.sy = r.height / (v.yMax - v.yMin);
+  v.ox = -v.xMin * v.sx; v.oy = v.yMax * v.sy;
+  draw();
+}
+function w2sx(x){ return S.view.ox + x*S.view.sx; }
+function w2sy(y){ return S.view.oy - y*S.view.sy; }
+function s2wx(sx){ return (sx - S.view.ox)/S.view.sx; }
+
+//---------------- 描画 ----------------
+function drawGrid(r){
+  ctx.strokeStyle = 'rgba(255,255,255,0.045)'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let gx=Math.ceil(S.view.xMin); gx<=Math.floor(S.view.xMax); gx++){
+    const x = w2sx(gx); ctx.moveTo(x,0); ctx.lineTo(x,r.height);
+  }
+  for (let gy=Math.ceil(S.view.yMin); gy<=Math.floor(S.view.yMax); gy++){
+    const y = w2sy(gy); ctx.moveTo(0,y); ctx.lineTo(r.width,y);
+  }
+  ctx.stroke();
+  // 軸
+  ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+  ctx.beginPath();
+  const yzero=w2sy(0), xzero=w2sx(0);
+  ctx.moveTo(0,yzero); ctx.lineTo(r.width,yzero);
+  ctx.moveTo(xzero,0); ctx.lineTo(xzero,r.height);
+  ctx.stroke();
+}
+
+function drawFunction(){
+  const F = FUNC_BY_KEY[S.funcKey];
+  const f = F.f;
+  ctx.strokeStyle = 'rgba(207,224,244,0.95)';
+  ctx.lineWidth = 2.0;
+  const xMin = S.view.xMin, xMax = S.view.xMax;
+  const N = 1600;
+  const yClipLo = S.view.yMin - 1, yClipHi = S.view.yMax + 1;
+
+  // 描画関数（給アンチ jump 配慮）
+  function drawSegment(xa, xb){
+    let started = false;
+    for (let i=0; i<=N; i++){
+      const x = xa + (xb - xa)*i/N;
+      const y = f(x);
+      const outOfRange = !isFinite(y) || y < yClipLo || y > yClipHi;
+      if (outOfRange){
+        if (started){ ctx.stroke(); started = false; }   // 範囲外に出るたびに描画を確定
+        continue;
+      }
+      const sx = w2sx(x), sy = w2sy(y);
+      if (!started){ ctx.beginPath(); ctx.moveTo(sx,sy); started = true; }
+      else ctx.lineTo(sx,sy);
+    }
+    if (started) ctx.stroke();
+  }
+
+  if (F.type==='gap'){
+    const g = F.gaps[0];
+    drawSegment(xMin, g - 0.002);
+    drawSegment(g + 0.002, xMax);
+  } else if (F.type==='step'){
+    // 2 つの水平セグメントを区別して描く
+    for (const j of F.jumps){
+      drawSegment(xMin, j - 0.001);
+      drawSegment(j + 0.001, xMax);
+    }
+    // 跳び点で「●(右値)」と「○(左値)」を表示しない（教科書的には可、今回は省略）
+  } else if (F.type==='point' || F.type==='osc'){
+    drawSegment(xMin, xMax);
+  } else {
+    drawSegment(xMin, xMax);
+  }
+
+  // 不連続を示す点(跳びや付け替え)
+  if (F.type==='step'){
+    for (const j of F.jumps){
+      // 右側値 (closed)
+      ctx.fillStyle = '#cfe0f4'; ctx.beginPath(); ctx.arc(w2sx(j), w2sy(f(j+0.01)), 4, 0, 2*Math.PI); ctx.fill();
+      // 左側値 (open)
+      ctx.fillStyle = '#0e1116'; ctx.strokeStyle='#cfe0f4'; ctx.lineWidth=1.6;
+      ctx.beginPath(); ctx.arc(w2sx(j), w2sy(f(j-0.01)), 4, 0, 2*Math.PI); ctx.fill(); ctx.stroke();
+    }
+  } else if (F.type==='point'){
+    for (const [j,v] of F.pointFix){
+      ctx.fillStyle = '#cfe0f4'; ctx.beginPath(); ctx.arc(w2sx(j), w2sy(v), 4, 0, 2*Math.PI); ctx.fill();
+      ctx.fillStyle = '#0e1116'; ctx.strokeStyle='#cfe0f4'; ctx.lineWidth=1.6;
+      const limVal = j;       // 連続だったときの値
+      ctx.beginPath(); ctx.arc(w2sx(j), w2sy(limVal), 4, 0, 2*Math.PI); ctx.fill(); ctx.stroke();
+    }
+  }
+}
+
+function draw(){
+  const r = cv.parentElement.getBoundingClientRect();
+  ctx.clearRect(0,0,r.width,r.height);
+  drawGrid(r);
+
+  const F = FUNC_BY_KEY[S.funcKey];
+  const yc = F.f(S.x0);
+
+  // ε 帯（水平）
+  if (isFinite(yc)){
+    const yLoS = w2sy(yc + S.eps), yHiS = w2sy(yc - S.eps);
+    ctx.fillStyle = 'rgba(239,106,106,0.22)';
+    ctx.fillRect(0, yLoS, r.width, yHiS - yLoS);
+    // 境界線（点線）
+    ctx.strokeStyle = 'rgba(239,106,106,0.85)'; ctx.lineWidth = 1; ctx.setLineDash([4,3]);
+    ctx.beginPath(); ctx.moveTo(0,yLoS); ctx.lineTo(r.width,yLoS); ctx.moveTo(0,yHiS); ctx.lineTo(r.width,yHiS); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // δ の数値計算
+  const res = computeDelta(F.f, S.x0, S.eps);
+
+  // δ 帯（縦）
+  if (!res.bad && res.delta > 0){
+    const xLoS = w2sx(S.x0 - res.delta), xHiS = w2sx(S.x0 + res.delta);
+    ctx.fillStyle = 'rgba(90,209,154,0.22)';
+    ctx.fillRect(xLoS, 0, xHiS - xLoS, r.height);
+    ctx.strokeStyle = 'rgba(90,209,154,0.85)'; ctx.lineWidth = 1; ctx.setLineDash([4,3]);
+    ctx.beginPath(); ctx.moveTo(xLoS,0); ctx.lineTo(xLoS,r.height); ctx.moveTo(xHiS,0); ctx.lineTo(xHiS,r.height); ctx.stroke();
+    ctx.setLineDash([]);
+  } else {
+    // 失敗時: x₀ の縦線だけ、警告色
+    const xS = w2sx(S.x0);
+    ctx.strokeStyle = 'rgba(255,138,76,0.7)'; ctx.lineWidth = 1.5; ctx.setLineDash([5,4]);
+    ctx.beginPath(); ctx.moveTo(xS,0); ctx.lineTo(xS,r.height); ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // 関数本体
+  drawFunction();
+
+  // 点 (x₀, f(x₀))
+  if (isFinite(yc)){
+    const sx = w2sx(S.x0), sy = w2sy(yc);
+    ctx.fillStyle = '#ffd24a'; ctx.beginPath(); ctx.arc(sx,sy,5,0,2*Math.PI); ctx.fill();
+    ctx.strokeStyle = '#0e1116'; ctx.lineWidth = 1; ctx.stroke();
+    // 補助線
+    ctx.strokeStyle = 'rgba(255,210,74,0.4)'; ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(sx, w2sy(0)); ctx.lineTo(sx, sy); ctx.moveTo(w2sx(0), sy); ctx.lineTo(sx, sy); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // ステータス・結果
+  document.getElementById('st-x').textContent = S.x0.toFixed(3);
+  document.getElementById('st-e').textContent = S.eps.toFixed(2);
+  document.getElementById('st-d').textContent = res.bad ? '—' : res.delta.toFixed(3);
+  document.getElementById('r-fx').textContent = isFinite(yc) ? yc.toFixed(3) : '未定義';
+  document.getElementById('r-d').textContent  = res.bad ? '取れない' : res.delta.toFixed(3);
+  const v = document.getElementById('r-v');
+  const ver = document.getElementById('verdict');
+  if (res.bad){
+    v.innerHTML = '<span class="bad">δ なし → x₀ で不連続の疑い</span>';
+    ver.innerHTML = '<span style="color:var(--cBad)">⚠ δ が取れない (不連続)</span>';
+  } else {
+    v.innerHTML = '<span class="ok">δ ≈ ' + res.delta.toFixed(3) + ' で条件を満たす</span>';
+    ver.innerHTML = '<span style="color:var(--cDel)">✓ 連続 (この ε で OK)</span>';
+  }
+}
+
+//---------------- UI ----------------
+function setFunc(key){
+  S.funcKey = key;
+  document.querySelectorAll('#funcs button').forEach(b=>b.classList.toggle('active', b.dataset.key===key));
+  draw();
+}
+function bindUI(){
+  const fg = document.getElementById('funcs');
+  for (const F of FUNCS){
+    const b = document.createElement('button');
+    b.textContent = F.name; b.dataset.key = F.key;
+    if (F.key===S.funcKey) b.classList.add('active');
+    b.addEventListener('click', ()=>setFunc(F.key));
+    fg.appendChild(b);
+  }
+  const xIn = document.getElementById('x');
+  xIn.addEventListener('input', ()=>{ S.x0 = parseFloat(xIn.value); document.getElementById('x-v').textContent = S.x0.toFixed(3); draw(); });
+  const eIn = document.getElementById('e');
+  eIn.addEventListener('input', ()=>{ S.eps = parseFloat(eIn.value); document.getElementById('e-v').textContent = S.eps.toFixed(2); draw(); });
+
+  // クリック / ドラッグで x₀
+  function setX0FromEvent(e){
+    const rect = cv.getBoundingClientRect();
+    const wx = s2wx(e.clientX - rect.left);
+    S.x0 = Math.max(S.view.xMin+0.01, Math.min(S.view.xMax-0.01, wx));
+    document.getElementById('x').value = S.x0.toString();
+    document.getElementById('x-v').textContent = S.x0.toFixed(3);
+    draw();
+  }
+  cv.addEventListener('pointerdown', e=>{ S.dragging=true; cv.setPointerCapture(e.pointerId); setX0FromEvent(e); });
+  cv.addEventListener('pointermove', e=>{ if (S.dragging) setX0FromEvent(e); });
+  cv.addEventListener('pointerup', ()=>{ S.dragging=false; });
+
+  window.addEventListener('resize', resize);
+}
+
+bindUI(); resize();
+</script>
+</body>
+</html>

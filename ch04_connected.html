@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>第4章 連結性・弧状連結性</title>
+<style>
+  :root { --bg:#0e1116; --panel:#161b22; --panel2:#1c232d; --border:#2a323d;
+          --text:#d6dde6; --muted:#8b97a6; --accent:#4ea1ff; --accent2:#ffb454;
+          --cSet:#4ea1ff; --cPath:#5ad19a; --cFail:#ef6a6a; --cDot:#ffd24a;
+          --good:#5ad19a; --bad:#ef6a6a; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; height:100%; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; }
+  #app { display:flex; height:100vh; overflow:hidden; }
+  #stage { flex:1; position:relative; min-width:0; }
+  canvas { display:block; width:100%; height:100%; background:radial-gradient(circle at 50% 45%,#131a24 0%,#0e1116 72%); }
+  #sidebar { width:340px; flex:0 0 340px; background:var(--panel); border-left:1px solid var(--border);
+    overflow-y:auto; padding:14px 16px 40px; font-size:13px; }
+  h1 { font-size:15px; margin:0 0 2px; }
+  .nav { font-size:11px; margin:0 0 10px; }
+  .nav a { color:var(--accent); text-decoration:none; }
+  .nav a:hover { text-decoration:underline; }
+  .sub { color:var(--muted); font-size:11.5px; margin:0 0 12px; line-height:1.5; }
+  .group { background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:12px; }
+  .group h2 { font-size:12px; margin:0 0 10px; color:var(--accent); font-weight:600; }
+  .presetGrid { display:grid; grid-template-columns:1fr; gap:5px; }
+  .presetGrid button { background:#233040; color:var(--text); border:1px solid var(--border); border-radius:7px;
+    padding:7px 9px; font-size:12px; cursor:pointer; font-family:inherit; text-align:left; }
+  .presetGrid button:hover { background:#2c3c50; }
+  .presetGrid button.active { background:var(--accent); color:#05101e; border-color:var(--accent); font-weight:600; }
+  .verdict { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .vbox { padding:8px 10px; border-radius:7px; background:#0e1116; border:1px solid var(--border); font-size:12px; }
+  .vbox .lbl { color:var(--muted); font-size:10.5px; display:block; }
+  .vbox .val.good { color:var(--good); font-weight:600; }
+  .vbox .val.bad  { color:var(--bad);  font-weight:600; }
+  button.wide { width:100%; background:#233040; color:var(--text); border:1px solid var(--border); border-radius:8px;
+    padding:8px; font-size:13px; cursor:pointer; font-family:inherit; }
+  button.wide:hover { background:#2c3c50; }
+  button.wide.primary { background:var(--accent); color:#05101e; border-color:var(--accent); font-weight:600; }
+  button.wide.primary:hover { background:#6fb4ff; }
+  .pairList { display:flex; flex-direction:column; gap:5px; margin-top:8px; }
+  .pairList button { background:#1c232d; color:var(--text); border:1px solid var(--border); border-radius:6px;
+    padding:6px 8px; font-size:11.5px; cursor:pointer; font-family:inherit; text-align:left; }
+  .pairList button:hover { background:#26303c; }
+  .pairList button.active { border-color:var(--accent2); }
+  .hint { color:var(--muted); font-size:11.5px; line-height:1.6; }
+  .hint b { color:var(--text); }
+  code { background:#0e1116; padding:1px 6px; border-radius:4px; color:var(--accent2); font-size:11.5px; }
+  #status { position:absolute; top:14px; left:16px; font-size:12px; color:var(--muted);
+    background:rgba(14,17,22,.7); padding:6px 10px; border-radius:8px; border:1px solid var(--border);
+    pointer-events:none; backdrop-filter:blur(4px); }
+  #status b { color:var(--accent2); }
+  #verdictBar { position:absolute; top:14px; right:16px; font-size:12.5px; font-weight:600;
+    background:rgba(14,17,22,.78); padding:7px 12px; border-radius:8px; border:1px solid var(--border);
+    pointer-events:none; backdrop-filter:blur(4px); }
+  #note { position:absolute; bottom:12px; left:16px; right:24px; max-width:680px;
+    font-size:12px; color:var(--text); background:rgba(14,17,22,.78); padding:8px 12px;
+    border-radius:8px; border:1px solid var(--border); pointer-events:none; line-height:1.55; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="status">プリセット: <b id="st-p">区間 [0,1]</b></div>
+    <div id="verdictBar">—</div>
+    <div id="note">—</div>
+  </div>
+  <div id="sidebar">
+    <h1>第4章 連結性・弧状連結性</h1>
+    <p class="nav">▸ <a href="index.html">索引へ戻る</a></p>
+    <p class="sub">2点を経路で結べるか?(弧状連結) 集合をふたつに「裂けない」か?(連結) を、典型例で見ます。<b>弧状連結 ⇒ 連結</b> ですが、逆は一般に成り立ちません(後出: 位相幾何学者の正弦曲線)。</p>
+
+    <div class="group">
+      <h2>プリセット</h2>
+      <div class="presetGrid" id="presets"></div>
+    </div>
+
+    <div class="group">
+      <h2>判定</h2>
+      <div class="verdict">
+        <div class="vbox"><span class="lbl">連結 (connected)</span><span class="val" id="v-conn">—</span></div>
+        <div class="vbox"><span class="lbl">弧状連結 (path-conn.)</span><span class="val" id="v-path">—</span></div>
+      </div>
+      <p class="hint" style="margin-top:8px" id="v-explain">—</p>
+    </div>
+
+    <div class="group">
+      <h2>経路をたどる</h2>
+      <button id="play" class="wide primary">▶ 経路をたどる</button>
+      <div class="pairList" id="pairs"></div>
+      <p class="hint" style="margin-top:8px">2点ペアを切り替え、「経路をたどる」を押すと、集合内で 2 点を結ぶ経路があるか試します。失敗するペアでは「2つに裂けて経路が無い」ことや「無限に振動して届かない」ことが見えます。</p>
+    </div>
+
+    <div class="group">
+      <h2>定義</h2>
+      <p class="hint"><b>連結</b>: X が空でない2つの開集合の disjoint union として書けない。</p>
+      <p class="hint"><b>弧状連結</b>: 任意の 2点 x, y に対し連続写像 γ: [0,1] → X で γ(0)=x, γ(1)=y となるものが存在。</p>
+      <p class="hint">弧状連結 ⇒ 連結。<b>逆は成り立たない</b>(位相幾何学者の正弦曲線)。</p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+//==================================================================
+// 第4章 連結性・弧状連結性
+//==================================================================
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+
+const S = {
+  presetKey: 'interval',
+  pairIdx: 0,
+  view: { scale: 200, ox: 0, oy: 0 },
+  anim: { running:false, t:0, lastTime:0, dur:2.6 },  // dur 秒
+};
+
+//---------------- ビュー ----------------
+function resize(){
+  const r = cv.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio||1;
+  cv.width = Math.floor(r.width*dpr); cv.height = Math.floor(r.height*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const m = Math.min(r.width, r.height);
+  S.view.scale = m/4.4;
+  S.view.ox = r.width/2; S.view.oy = r.height/2;
+  draw();
+}
+function w2s(x,y){ return [S.view.ox + x*S.view.scale, S.view.oy - y*S.view.scale]; }
+function hexToRgba(hex, a){
+  const h = hex.replace('#','');
+  return `rgba(${parseInt(h.substring(0,2),16)},${parseInt(h.substring(2,4),16)},${parseInt(h.substring(4,6),16)},${a})`;
+}
+
+//---------------- 描画ヘルパ ----------------
+function drawGrid(r){
+  ctx.strokeStyle = 'rgba(255,255,255,0.045)'; ctx.lineWidth = 1;
+  const N = 3;
+  ctx.beginPath();
+  for (let gx=-N; gx<=N; gx++){ const s=w2s(gx,0); ctx.moveTo(s[0],0); ctx.lineTo(s[0],r.height); }
+  for (let gy=-N; gy<=N; gy++){ const s=w2s(0,gy); ctx.moveTo(0,s[1]); ctx.lineTo(r.width,s[1]); }
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  const o = w2s(0,0);
+  ctx.beginPath(); ctx.moveTo(o[0],0); ctx.lineTo(o[0],r.height); ctx.moveTo(0,o[1]); ctx.lineTo(r.width,o[1]); ctx.stroke();
+}
+function drawSegment(ax,ay,bx,by, color, lw){
+  ctx.strokeStyle=color; ctx.lineWidth=lw;
+  const a=w2s(ax,ay), b=w2s(bx,by);
+  ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke();
+}
+function drawDiskClosed(cx,cy,r, fillColor, strokeColor, lw){
+  const [sx,sy] = w2s(cx,cy);
+  const rr = r*S.view.scale;
+  ctx.fillStyle = fillColor; ctx.beginPath(); ctx.arc(sx,sy,rr,0,2*Math.PI); ctx.fill();
+  if (strokeColor){ ctx.strokeStyle = strokeColor; ctx.lineWidth = lw; ctx.stroke(); }
+}
+function drawAnnulus(cx,cy, r1, r2, fillColor, strokeColor, lw){
+  const [sx,sy] = w2s(cx,cy);
+  ctx.fillStyle = fillColor;
+  ctx.beginPath();
+  ctx.arc(sx,sy, r2*S.view.scale, 0, 2*Math.PI);
+  ctx.arc(sx,sy, r1*S.view.scale, 0, 2*Math.PI, true);  // 反時計でくり抜き
+  ctx.fill('evenodd');
+  if (strokeColor){
+    ctx.strokeStyle=strokeColor; ctx.lineWidth=lw;
+    ctx.beginPath(); ctx.arc(sx,sy, r2*S.view.scale, 0, 2*Math.PI); ctx.stroke();
+    ctx.beginPath(); ctx.arc(sx,sy, r1*S.view.scale, 0, 2*Math.PI); ctx.stroke();
+  }
+}
+function drawDot(x,y, r, fill, stroke){
+  const s = w2s(x,y);
+  ctx.fillStyle = fill;
+  ctx.beginPath(); ctx.arc(s[0],s[1], r, 0, 2*Math.PI); ctx.fill();
+  if (stroke){ ctx.strokeStyle=stroke; ctx.lineWidth=1.5; ctx.stroke(); }
+}
+function drawPolyline(pts, color, lw, dashed){
+  if (!pts || pts.length < 2) return;
+  ctx.strokeStyle=color; ctx.lineWidth=lw;
+  ctx.setLineDash(dashed?[5,4]:[]);
+  ctx.beginPath();
+  const s0 = w2s(pts[0][0],pts[0][1]); ctx.moveTo(s0[0],s0[1]);
+  for (let i=1;i<pts.length;i++){ const s=w2s(pts[i][0],pts[i][1]); ctx.lineTo(s[0],s[1]); }
+  ctx.stroke(); ctx.setLineDash([]);
+}
+
+//---------------- 経路パラメータ ----------------
+// 直線パスは [[ax,ay],[bx,by]] のような頂点列で表す。
+// 円弧などは多数の点でサンプル。
+function linePath(a,b, n){ const out=[]; for(let i=0;i<=n;i++){ const t=i/n; out.push([a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t]); } return out; }
+function arcAroundHole(a,b, cx,cy, r1, r2){
+  // 中心 (cx,cy) の環状域 r1≤r≤r2 内で a,b を結ぶ。
+  // 簡易: 中心から見た角を使い、r=(r1+r2)/2 の円上で a 側 → b 側に弧を通る。
+  // 始点・終点に短いラジアル部分を加える。
+  const angA = Math.atan2(a[1]-cy, a[0]-cx);
+  const angB = Math.atan2(b[1]-cy, b[0]-cx);
+  const rMid = (r1+r2)/2;
+  let dAng = angB - angA;
+  while (dAng > Math.PI) dAng -= 2*Math.PI;
+  while (dAng < -Math.PI) dAng += 2*Math.PI;
+  const pA = [cx + rMid*Math.cos(angA), cy + rMid*Math.sin(angA)];
+  const pB = [cx + rMid*Math.cos(angB), cy + rMid*Math.sin(angB)];
+  const N = 80;
+  const arc = [];
+  for (let i=0;i<=N;i++){ const t=i/N, ang=angA + dAng*t; arc.push([cx+rMid*Math.cos(ang), cy+rMid*Math.sin(ang)]); }
+  return [a, pA, ...arc, pB, b];
+}
+
+//---------------- プリセット ----------------
+const PRESETS = [
+  {
+    key:'interval', name:'区間 [0, 1] (≅ 1次元の連結例)',
+    desc:'A = [0, 1] (x 軸上に置いた閉区間)',
+    verdict:{ conn:true, pathConn:true,
+              explain:'区間は連結かつ弧状連結。最も基本的な例。' },
+    drawSet(){
+      drawSegment(-1.2,0, 1.2,0, hexToRgba('#4ea1ff',0.20), 22);   // 帯
+      drawSegment(-1.2,0, 1.2,0, '#4ea1ff', 2.6);
+      // 端点(両方含む)
+      drawDot(-1.2,0,5,'#4ea1ff','#0e1116');
+      drawDot( 1.2,0,5,'#4ea1ff','#0e1116');
+    },
+    pairs:[
+      { name:'端から端', a:[-1.1,0], b:[1.1,0], success:true, mode:'line' },
+      { name:'内部の2点', a:[-0.5,0], b:[0.7,0], success:true, mode:'line' },
+    ]
+  },
+  {
+    key:'twoIntervals', name:'2つの区間の和 [−1.5,−0.4] ∪ [0.4,1.5] (不連結)',
+    desc:'A = [−1.5,−0.4] ∪ [0.4,1.5]',
+    verdict:{ conn:false, pathConn:false,
+              explain:'A は 2 つの開集合 (−2, 0)∩A と (0, 2)∩A の disjoint union として相対位相で書ける。よって連結でない (したがって弧状連結でもない)。' },
+    drawSet(){
+      for (const [a,b] of [[-1.5,-0.4],[0.4,1.5]]){
+        drawSegment(a,0,b,0, hexToRgba('#4ea1ff',0.20), 22);
+        drawSegment(a,0,b,0, '#4ea1ff', 2.6);
+        drawDot(a,0,5,'#4ea1ff','#0e1116'); drawDot(b,0,5,'#4ea1ff','#0e1116');
+      }
+    },
+    pairs:[
+      { name:'同じ成分内', a:[-1.3,0], b:[-0.6,0], success:true, mode:'line' },
+      { name:'異なる成分(失敗)', a:[-1.0,0], b:[1.0,0], success:false, mode:'split',
+        msg:'2つの連結成分にまたがる経路は集合内に存在しません。' },
+    ]
+  },
+  {
+    key:'disk', name:'閉円板 B(0, 1) (2次元の連結例)',
+    desc:'A = { (x,y) : x²+y² ≤ 1 }',
+    verdict:{ conn:true, pathConn:true,
+              explain:'凸集合(任意の2点を結ぶ線分が含まれる)はつねに弧状連結。よって連結。' },
+    drawSet(){
+      drawDiskClosed(0,0, 1, hexToRgba('#4ea1ff',0.20), '#4ea1ff', 2.2);
+    },
+    pairs:[
+      { name:'対角に2点', a:[-0.7,-0.5], b:[0.6,0.5], success:true, mode:'line' },
+    ]
+  },
+  {
+    key:'twoDisks', name:'2つの円板の和 (不連結)',
+    desc:'A = B(−1.2; 0.55) ∪ B(1.2; 0.55) (交わらない)',
+    verdict:{ conn:false, pathConn:false,
+              explain:'A は 2 つの開集合の disjoint union として書けるので連結でない。' },
+    drawSet(){
+      drawDiskClosed(-1.2,0,0.55, hexToRgba('#4ea1ff',0.20), '#4ea1ff', 2.2);
+      drawDiskClosed( 1.2,0,0.55, hexToRgba('#4ea1ff',0.20), '#4ea1ff', 2.2);
+    },
+    pairs:[
+      { name:'同じ円板内', a:[-1.4,0.1], b:[-1.0,-0.2], success:true, mode:'line' },
+      { name:'異なる円板(失敗)', a:[-1.2,0], b:[1.2,0], success:false, mode:'split',
+        msg:'2つの離れた円板の間には集合内の経路が存在しません。' },
+    ]
+  },
+  {
+    key:'annulus', name:'円環(annulus) (連結・弧状連結だが凸でない)',
+    desc:'A = { (x,y) : 0.5 ≤ √(x²+y²) ≤ 1.3 }',
+    verdict:{ conn:true, pathConn:true,
+              explain:'環は凸ではないが弧状連結。直線が穴を通る場合でも、円周に沿って迂回する経路がある。' },
+    drawSet(){
+      drawAnnulus(0,0, 0.5, 1.3, hexToRgba('#4ea1ff',0.20), '#4ea1ff', 2.2);
+    },
+    pairs:[
+      { name:'近接の2点(直線でOK)', a:[1.0,0.4], b:[0.9,-0.4], success:true, mode:'line' },
+      { name:'反対側(直線は穴を通る → 円弧で迂回)', a:[-1.05,0], b:[1.05,0], success:true, mode:'arcAroundHole',
+        params:{cx:0,cy:0, r1:0.5, r2:1.3} },
+    ]
+  },
+  {
+    key:'sineCurve', name:'位相幾何学者の正弦曲線 (連結だが弧状連結でない)',
+    desc:'A = { (x, sin(1/x)) : 0 < x ≤ 2/π } ∪ ({0} × [−1, 1])',
+    verdict:{ conn:true, pathConn:false,
+              explain:'グラフ部分とその閉包に含まれる極限線分 {0}×[−1,1] からなる。全体は連結 (極限線分の点はグラフの集積点) だが、グラフから極限線分へは「無限に振動する」ため連続経路で到達できない → 弧状連結ではない。' },
+    drawSet(){
+      // 極限線分 {0} × [-1,1]
+      drawSegment(0,-1, 0,1, hexToRgba('#4ea1ff',0.28), 12);
+      drawSegment(0,-1, 0,1, '#4ea1ff', 2.8);
+      // グラフ部分 (x = 0.003 .. 2/π)、対数的に密にサンプル
+      const X = [];
+      const xMin = 0.003, xMax = 2/Math.PI;
+      const N = 1800;
+      for (let i=0;i<=N;i++){
+        const t = i/N;
+        const x = xMin * Math.pow(xMax/xMin, t);   // log spacing
+        X.push([x, Math.sin(1/x)]);
+      }
+      drawPolyline(X, '#4ea1ff', 1.6, false);
+    },
+    pairs:[
+      { name:'グラフ内の2点(可能)', a:[1/(Math.PI), Math.sin(Math.PI)], b:[2/Math.PI*0.7, Math.sin(1/(2/Math.PI*0.7))], success:true, mode:'sineGraph' },
+      { name:'極限線分の2点(可能)', a:[0,-0.8], b:[0,0.8], success:true, mode:'line' },
+      { name:'グラフ → 極限線分(不可能!)', a:[0.5, Math.sin(2)], b:[0,0.3], success:false, mode:'oscillate',
+        msg:'グラフ上を x→0 へ進めると 1/x の発散で振動が無限に密になり、経路は極限線分の点に到達できません。よって弧状連結ではありません。' },
+    ]
+  },
+];
+const PRESET = Object.fromEntries(PRESETS.map(p=>[p.key,p]));
+
+//---------------- 経路の生成 ----------------
+function buildPathPoints(preset, pair){
+  if (!pair.success) return null;     // 失敗は経路なし
+  switch(pair.mode){
+    case 'line':
+      return linePath(pair.a, pair.b, 60);
+    case 'arcAroundHole': {
+      const p = pair.params;
+      return arcAroundHole(pair.a, pair.b, p.cx, p.cy, p.r1, p.r2);
+    }
+    case 'sineGraph': {
+      // a,b の x をつないでサインカーブに沿う
+      const x1 = Math.min(pair.a[0], pair.b[0]);
+      const x2 = Math.max(pair.a[0], pair.b[0]);
+      const out = [];
+      const N = 400;
+      for (let i=0;i<=N;i++){
+        const t = i/N;
+        const x = x1 + (x2-x1)*t;
+        out.push([x, Math.sin(1/x)]);
+      }
+      if (pair.a[0] > pair.b[0]) out.reverse();
+      return out;
+    }
+  }
+  return null;
+}
+
+//---------------- 描画 ----------------
+function draw(){
+  const r = cv.parentElement.getBoundingClientRect();
+  ctx.clearRect(0,0,r.width,r.height);
+  drawGrid(r);
+
+  const p = PRESET[S.presetKey]; if (!p) return;
+  p.drawSet();
+
+  const pair = p.pairs[S.pairIdx];
+  if (pair){
+    // 2点の表示
+    drawDot(pair.a[0], pair.a[1], 6, '#ffd24a', '#0e1116');
+    drawDot(pair.b[0], pair.b[1], 6, '#ffd24a', '#0e1116');
+
+    // 経路 or 失敗描画 + アニメ
+    if (pair.success){
+      const path = buildPathPoints(p, pair);
+      if (path){
+        drawPolyline(path, hexToRgba('#5ad19a', 0.55), 3.2, false);
+        if (S.anim.running){
+          // 端点 a から path に沿ってアニメ
+          const t = S.anim.t;
+          const idx = Math.max(0, Math.min(path.length-1, Math.floor(t*(path.length-1))));
+          const pt = path[idx];
+          drawDot(pt[0], pt[1], 7, '#5ad19a', '#0e1116');
+        }
+      }
+    } else {
+      // 失敗ケース
+      if (pair.mode==='split'){
+        // 中央に「✗」マーク
+        const ax = w2s(pair.a[0], pair.a[1]), bx = w2s(pair.b[0], pair.b[1]);
+        ctx.strokeStyle = hexToRgba('#ef6a6a', 0.6); ctx.lineWidth = 2; ctx.setLineDash([8,5]);
+        ctx.beginPath(); ctx.moveTo(ax[0],ax[1]); ctx.lineTo(bx[0],bx[1]); ctx.stroke(); ctx.setLineDash([]);
+        // x マーク
+        const mx = (ax[0]+bx[0])/2, my = (ax[1]+bx[1])/2;
+        ctx.strokeStyle = '#ef6a6a'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(mx-10,my-10); ctx.lineTo(mx+10,my+10);
+        ctx.moveTo(mx+10,my-10); ctx.lineTo(mx-10,my+10); ctx.stroke();
+      } else if (pair.mode==='oscillate'){
+        // a (グラフ上) → x→0 を試みるが届かない
+        // アニメ: x = x0 * (1-t')^4 で 0 に近づくが、いつまでも到達しない
+        const x0 = pair.a[0];
+        const t = S.anim.t;
+        const x = Math.max(0.002, x0 * Math.pow(1 - t*0.999, 5));
+        // 軌跡: 始点から現在までを描く
+        const trace = [];
+        const M = 600;
+        for (let i=0;i<=M;i++){
+          const tt = (i/M) * t;
+          const xi = Math.max(0.002, x0 * Math.pow(1 - tt*0.999, 5));
+          trace.push([xi, Math.sin(1/xi)]);
+        }
+        drawPolyline(trace, hexToRgba('#ef6a6a', 0.85), 2.2, false);
+        // 現在位置
+        drawDot(x, Math.sin(1/x), 6, '#ef6a6a', '#0e1116');
+        // 目標点(届かない)に向けて破線
+        const bs = w2s(pair.b[0],pair.b[1]);
+        const cur = w2s(x, Math.sin(1/x));
+        ctx.strokeStyle = hexToRgba('#ef6a6a', 0.35); ctx.lineWidth=1; ctx.setLineDash([5,4]);
+        ctx.beginPath(); ctx.moveTo(cur[0],cur[1]); ctx.lineTo(bs[0],bs[1]); ctx.stroke(); ctx.setLineDash([]);
+      }
+    }
+  }
+
+  // ステータス
+  document.getElementById('st-p').textContent = p.name;
+  // 判定欄
+  const cE = document.getElementById('v-conn'), pE = document.getElementById('v-path');
+  cE.textContent = p.verdict.conn ? '✓ 連結' : '✗ 連結でない';
+  cE.className = 'val ' + (p.verdict.conn ? 'good' : 'bad');
+  pE.textContent = p.verdict.pathConn ? '✓ 弧状連結' : '✗ 弧状連結でない';
+  pE.className = 'val ' + (p.verdict.pathConn ? 'good' : 'bad');
+  document.getElementById('v-explain').textContent = p.verdict.explain;
+  // バナー
+  let vBar = '';
+  if (p.verdict.conn && p.verdict.pathConn) vBar = '<span style="color:var(--good)">✓ 連結 かつ 弧状連結</span>';
+  else if (p.verdict.conn && !p.verdict.pathConn) vBar = '<span style="color:var(--accent2)">⚠ 連結だが 弧状連結でない</span>';
+  else vBar = '<span style="color:var(--bad)">✗ 連結でない</span>';
+  document.getElementById('verdictBar').innerHTML = vBar;
+
+  // ノート
+  let n = p.desc;
+  if (pair && !pair.success && pair.msg) n += '   /   ' + pair.msg;
+  document.getElementById('note').textContent = n;
+}
+
+//---------------- アニメーション ----------------
+function tick(now){
+  if (S.anim.running){
+    const dt = (now - S.anim.lastTime)/1000;
+    S.anim.lastTime = now;
+    S.anim.t += dt / S.anim.dur;
+    if (S.anim.t >= 1){
+      // 完了 — 失敗ケース(oscillate)は数秒静止して停止表示
+      S.anim.t = 1;
+      S.anim.running = false;
+      document.getElementById('play').textContent = '↺ もう一度たどる';
+    }
+    draw();
+  }
+  requestAnimationFrame(tick);
+}
+
+//---------------- UI ----------------
+function rebuildPairList(){
+  const list = document.getElementById('pairs');
+  list.innerHTML = '';
+  const p = PRESET[S.presetKey];
+  p.pairs.forEach((pair, i) => {
+    const b = document.createElement('button');
+    b.textContent = (i+1)+'. '+pair.name + (pair.success ? '' : '  (✗)');
+    if (i === S.pairIdx) b.classList.add('active');
+    b.addEventListener('click', ()=>{
+      S.pairIdx = i;
+      rebuildPairList();
+      stopAnim();
+      draw();
+    });
+    list.appendChild(b);
+  });
+}
+function startAnim(){
+  S.anim.running = true; S.anim.t = 0; S.anim.lastTime = performance.now();
+  document.getElementById('play').textContent = '■ 停止';
+}
+function stopAnim(){
+  S.anim.running = false; S.anim.t = 0;
+  document.getElementById('play').textContent = '▶ 経路をたどる';
+}
+function bindUI(){
+  const grid = document.getElementById('presets');
+  for (const p of PRESETS){
+    const b = document.createElement('button');
+    b.textContent = p.name; b.dataset.key = p.key;
+    if (p.key === S.presetKey) b.classList.add('active');
+    b.addEventListener('click', ()=>{
+      S.presetKey = p.key; S.pairIdx = 0;
+      grid.querySelectorAll('button').forEach(x=>x.classList.toggle('active', x.dataset.key===p.key));
+      rebuildPairList();
+      stopAnim();
+      draw();
+    });
+    grid.appendChild(b);
+  }
+  rebuildPairList();
+  document.getElementById('play').addEventListener('click', ()=>{
+    if (S.anim.running){ stopAnim(); draw(); }
+    else { startAnim(); }
+  });
+  window.addEventListener('resize', resize);
+}
+
+bindUI(); resize(); requestAnimationFrame(tick);
+</script>
+</body>
+</html>

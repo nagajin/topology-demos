@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>第3章 位相空間 — 内部・閉包・境界・導集合</title>
+<style>
+  :root { --bg:#0e1116; --panel:#161b22; --panel2:#1c232d; --border:#2a323d;
+          --text:#d6dde6; --muted:#8b97a6; --accent:#4ea1ff; --accent2:#ffb454;
+          --cA:#4ea1ff; --cInt:#5ad19a; --cCl:#c486ff; --cBdy:#ef6a6a; --cDeriv:#ffd24a; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; height:100%; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; }
+  #app { display:flex; height:100vh; overflow:hidden; }
+  #stage { flex:1; position:relative; min-width:0; }
+  canvas { display:block; width:100%; height:100%; background:radial-gradient(circle at 50% 45%,#131a24 0%,#0e1116 72%); }
+  #sidebar { width:340px; flex:0 0 340px; background:var(--panel); border-left:1px solid var(--border);
+    overflow-y:auto; padding:14px 16px 40px; font-size:13px; }
+  h1 { font-size:15px; margin:0 0 2px; }
+  .nav { font-size:11px; margin:0 0 10px; }
+  .nav a { color:var(--accent); text-decoration:none; }
+  .nav a:hover { text-decoration:underline; }
+  .sub { color:var(--muted); font-size:11.5px; margin:0 0 12px; line-height:1.5; }
+  .group { background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:12px; }
+  .group h2 { font-size:12px; margin:0 0 10px; color:var(--accent); font-weight:600; }
+  .presetGrid { display:grid; grid-template-columns:1fr; gap:5px; }
+  .presetGrid button { background:#233040; color:var(--text); border:1px solid var(--border); border-radius:7px;
+    padding:7px 9px; font-size:12px; cursor:pointer; font-family:inherit; text-align:left; }
+  .presetGrid button:hover { background:#2c3c50; }
+  .presetGrid button.active { background:var(--accent); color:#05101e; border-color:var(--accent); font-weight:600; }
+  .check { display:flex; align-items:center; gap:8px; margin:7px 0; cursor:pointer; font-size:12.5px; }
+  .check input { accent-color:var(--accent); width:15px; height:15px; }
+  .sw { width:13px; height:13px; border-radius:3px; display:inline-block; margin-left:auto; }
+  .swR { width:18px; height:6px; border-radius:2px; display:inline-block; margin-left:auto; }
+  .hint { color:var(--muted); font-size:11.5px; line-height:1.6; }
+  .hint b { color:var(--text); }
+  .formulaLine { margin:4px 0; font-size:12px; color:var(--text); }
+  .formulaLine .lbl { color:var(--muted); display:inline-block; min-width:5em; }
+  code { background:#0e1116; padding:1px 6px; border-radius:4px; color:var(--accent2); font-size:11.5px; }
+  #status { position:absolute; top:14px; left:16px; font-size:12px; color:var(--muted);
+    background:rgba(14,17,22,.7); padding:6px 10px; border-radius:8px; border:1px solid var(--border);
+    pointer-events:none; backdrop-filter:blur(4px); }
+  #status b { color:var(--accent2); }
+  #note { position:absolute; bottom:12px; left:16px; right:24px; max-width:620px;
+    font-size:12px; color:var(--text); background:rgba(14,17,22,.78); padding:8px 12px;
+    border-radius:8px; border:1px solid var(--border); pointer-events:none; line-height:1.55; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="status">プリセット: <b id="st-p">開いた円板</b></div>
+    <div id="note">—</div>
+  </div>
+  <div id="sidebar">
+    <h1>第3章 位相空間 — int / cl / ∂ / A′</h1>
+    <p class="nav">▸ <a href="index.html">索引へ戻る</a></p>
+    <p class="sub">部分集合 A ⊂ ℝ² に対して、<b>内部</b> int(A)、<b>閉包</b> cl(A)、<b>境界</b> ∂A、<b>導集合</b> A′ がそれぞれどう違うかを、典型例で見比べます。表示は重ね合わせ可能です。</p>
+
+    <div class="group">
+      <h2>プリセット</h2>
+      <div class="presetGrid" id="presets"></div>
+    </div>
+
+    <div class="group">
+      <h2>表示する集合</h2>
+      <label class="check"><input type="checkbox" id="opt-A" checked> 集合 A <span class="sw" style="background:var(--cA)"></span></label>
+      <label class="check"><input type="checkbox" id="opt-int"> 内部 int(A) <span class="sw" style="background:var(--cInt)"></span></label>
+      <label class="check"><input type="checkbox" id="opt-cl"> 閉包 cl(A) <span class="sw" style="background:var(--cCl)"></span></label>
+      <label class="check"><input type="checkbox" id="opt-bdy"> 境界 ∂A <span class="swR" style="background:var(--cBdy)"></span></label>
+      <label class="check"><input type="checkbox" id="opt-deriv"> 導集合 A′ <span class="swR" style="background:var(--cDeriv); border:1px dashed var(--cDeriv); background:transparent"></span></label>
+    </div>
+
+    <div class="group">
+      <h2>このプリセット</h2>
+      <div class="formulaLine"><span class="lbl">A 自身:</span> <span id="f-A">—</span></div>
+      <div class="formulaLine"><span class="lbl">int(A):</span> <span id="f-int">—</span></div>
+      <div class="formulaLine"><span class="lbl">cl(A):</span>  <span id="f-cl">—</span></div>
+      <div class="formulaLine"><span class="lbl">∂A:</span>    <span id="f-bdy">—</span></div>
+      <div class="formulaLine"><span class="lbl">A′:</span>    <span id="f-deriv">—</span></div>
+    </div>
+
+    <div class="group">
+      <h2>定義</h2>
+      <p class="hint"><b>内部</b> int(A) = A に含まれる最大の開集合(= A の開核)<br>
+      <b>閉包</b> cl(A) = A を含む最小の閉集合(= A の閉包)<br>
+      <b>境界</b> ∂A = cl(A) ∖ int(A) = cl(A) ∩ cl(Aᶜ)<br>
+      <b>導集合</b> A′ = A の集積点全体。cl(A) = A ∪ A′。<br>
+      開集合 ⇔ A = int(A)、 閉集合 ⇔ A = cl(A) ⇔ A′ ⊂ A。</p>
+      <p class="hint" style="margin-top:6px">表示の凡例: <b>実線で囲まれた塗り</b>=その境界を含む、<b>破線で囲まれた塗り</b>=その境界を含まない。○(中空)=その点を除く、●(塗り)=その点を含む。</p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+//==================================================================
+// 第3章 位相空間 — 内部・閉包・境界・導集合のビジュアライザ
+//==================================================================
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+
+const COL = { A:'#4ea1ff', int:'#5ad19a', cl:'#c486ff', bdy:'#ef6a6a', deriv:'#ffd24a' };
+
+const S = {
+  presetKey: 'openDisk',
+  show: { A:true, int:false, cl:false, bdy:false, deriv:false },
+  view: { scale: 140, ox: 0, oy: 0 },
+};
+
+//---------------- ビュー ----------------
+function resize(){
+  const r = cv.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio||1;
+  cv.width = Math.floor(r.width*dpr); cv.height = Math.floor(r.height*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const m = Math.min(r.width, r.height);
+  S.view.scale = m/4.4;   // ±2.2 が収まる
+  S.view.ox = r.width/2; S.view.oy = r.height/2;
+  draw();
+}
+function w2s(x,y){ return [S.view.ox + x*S.view.scale, S.view.oy - y*S.view.scale]; }
+function hexToRgba(hex, a){
+  const h = hex.replace('#','');
+  const R = parseInt(h.substring(0,2),16), G = parseInt(h.substring(2,4),16), B = parseInt(h.substring(4,6),16);
+  return `rgba(${R},${G},${B},${a})`;
+}
+
+//---------------- シェイプの定義 ----------------
+// 各プリセットは A / int / cl / bdy / deriv の5つの「シェイプ」をもつ。
+// シェイプは描画方法の指定（{kind, ...params}）。
+// kind:
+//  - 'empty'         : 空集合 ∅（何も描かない）
+//  - 'diskOpen'      : 開円板（中身塗り＋破線円）
+//  - 'diskClosed'    : 閉円板（中身塗り＋実線円）
+//  - 'circle'        : 円周のみ（1次元曲線）
+//  - 'rectOpen'      : 開長方形
+//  - 'rectClosed'    : 閉長方形
+//  - 'rectFrame'     : 長方形の周のみ（1次元）
+//  - 'point'         : 1点（filled:false で中空＝除く点）
+//  - 'points'        : 複数の点（filled:false で中空）
+//  - 'denseDots'     : 領域内に密に点を配置（稠密の表現）
+//  - 'union'         : items を順に描く
+//  - 'minusPoint'    : base を描いた後、points を「中空丸」で重ねて「除外」を表現
+
+function renderShape(shape, role){
+  if (!shape || shape.kind==='empty') return;
+  const color = COL[role];
+  const dashFor = (role==='deriv') ? [6,4] : [5,4];
+  const lwOutline = (role==='bdy') ? 2.6 : 1.7;
+
+  function fill(alpha){ ctx.fillStyle = hexToRgba(color, alpha); }
+  function strokeStyleSet(dashed){
+    ctx.strokeStyle = color; ctx.lineWidth = lwOutline;
+    ctx.setLineDash(dashed ? dashFor : []);
+  }
+
+  switch(shape.kind){
+    case 'diskOpen':
+    case 'diskClosed': {
+      const [cx,cy] = w2s(shape.cx, shape.cy);
+      const rr = shape.r * S.view.scale;
+      if (role!=='bdy' && role!=='deriv'){
+        fill(role==='cl' ? 0.10 : 0.25);
+        ctx.beginPath(); ctx.arc(cx,cy,rr,0,2*Math.PI); ctx.fill();
+      }
+      strokeStyleSet(shape.kind==='diskOpen');
+      ctx.beginPath(); ctx.arc(cx,cy,rr,0,2*Math.PI); ctx.stroke();
+      ctx.setLineDash([]);
+      break;
+    }
+    case 'circle': {
+      const [cx,cy] = w2s(shape.cx, shape.cy);
+      strokeStyleSet(false);
+      ctx.beginPath(); ctx.arc(cx,cy,shape.r*S.view.scale,0,2*Math.PI); ctx.stroke();
+      break;
+    }
+    case 'rectOpen':
+    case 'rectClosed': {
+      const [x0,y0] = w2s(shape.x, shape.y + shape.h);
+      const w = shape.w*S.view.scale, h = shape.h*S.view.scale;
+      if (role!=='bdy' && role!=='deriv'){
+        fill(role==='cl' ? 0.10 : 0.25);
+        ctx.fillRect(x0,y0,w,h);
+      }
+      strokeStyleSet(shape.kind==='rectOpen');
+      ctx.strokeRect(x0,y0,w,h);
+      ctx.setLineDash([]);
+      break;
+    }
+    case 'rectFrame': {
+      const [x0,y0] = w2s(shape.x, shape.y + shape.h);
+      strokeStyleSet(false);
+      ctx.strokeRect(x0,y0, shape.w*S.view.scale, shape.h*S.view.scale);
+      break;
+    }
+    case 'point': {
+      const [px,py] = w2s(shape.x, shape.y);
+      ctx.lineWidth = 1.8; ctx.setLineDash([]); ctx.strokeStyle = color;
+      ctx.beginPath(); ctx.arc(px,py,5.5,0,2*Math.PI);
+      if (shape.filled !== false){ ctx.fillStyle = color; ctx.fill(); }
+      else { ctx.fillStyle = '#0e1116'; ctx.fill(); }   // 中空: 背景色で塗り
+      ctx.stroke();
+      break;
+    }
+    case 'points': {
+      ctx.lineWidth = 1.4; ctx.setLineDash([]); ctx.strokeStyle = color;
+      for (const [x,y] of shape.pts){
+        const [px,py] = w2s(x,y);
+        ctx.beginPath(); ctx.arc(px,py,4,0,2*Math.PI);
+        if (shape.filled !== false){ ctx.fillStyle = color; ctx.fill(); }
+        else { ctx.fillStyle = '#0e1116'; ctx.fill(); }
+        ctx.stroke();
+      }
+      break;
+    }
+    case 'denseDots': {
+      ctx.fillStyle = color;
+      const step = shape.step || 0.06;
+      for (let x = shape.x; x <= shape.x + shape.w + 1e-9; x += step){
+        for (let y = shape.y; y <= shape.y + shape.h + 1e-9; y += step){
+          const [sx,sy] = w2s(x,y);
+          ctx.beginPath(); ctx.arc(sx,sy,1.1,0,2*Math.PI); ctx.fill();
+        }
+      }
+      // 枠（cl などでは実線で囲うとわかりやすい）
+      if (shape.frame){
+        strokeStyleSet(false);
+        const [x0,y0] = w2s(shape.x, shape.y + shape.h);
+        ctx.strokeRect(x0,y0, shape.w*S.view.scale, shape.h*S.view.scale);
+      }
+      break;
+    }
+    case 'union': {
+      for (const sub of shape.items) renderShape(sub, role);
+      break;
+    }
+    case 'minusPoint': {
+      renderShape(shape.base, role);
+      // 「除外する点」を中空丸で重ね描き
+      ctx.lineWidth = 1.8; ctx.setLineDash([]); ctx.strokeStyle = color;
+      for (const p of shape.points){
+        const [px,py] = w2s(p[0], p[1]);
+        ctx.beginPath(); ctx.arc(px,py,5.2,0,2*Math.PI);
+        ctx.fillStyle = '#0e1116'; ctx.fill();
+        ctx.stroke();
+      }
+      break;
+    }
+  }
+  ctx.setLineDash([]);
+}
+
+//---------------- プリセット ----------------
+function seqPts(N){ const a=[]; for(let n=1;n<=N;n++) a.push([1/n, 0]); return a; }
+
+const PRESETS = [
+  {
+    key:'openDisk', name:'開いた円板 B°(0,1)',
+    desc:'A = { (x,y) : x² + y² < 1 }',
+    A:     {kind:'diskOpen',   cx:0,cy:0,r:1},
+    int:   {kind:'diskOpen',   cx:0,cy:0,r:1},
+    cl:    {kind:'diskClosed', cx:0,cy:0,r:1},
+    bdy:   {kind:'circle',     cx:0,cy:0,r:1},
+    deriv: {kind:'diskClosed', cx:0,cy:0,r:1},
+    txtA:'開円板 (境界を含まない)', txtInt:'A 自身 (A は開集合)', txtCl:'閉円板 = A ∪ 単位円', txtBdy:'単位円 S¹', txtDeriv:'閉円板 (cl(A) と一致)',
+    note:'A が開集合だから int(A) = A。境界(単位円)はどこも近づける点なので閉包に入る。'
+  },
+  {
+    key:'closedDisk', name:'閉じた円板 B(0,1)',
+    desc:'A = { (x,y) : x² + y² ≤ 1 }',
+    A:     {kind:'diskClosed', cx:0,cy:0,r:1},
+    int:   {kind:'diskOpen',   cx:0,cy:0,r:1},
+    cl:    {kind:'diskClosed', cx:0,cy:0,r:1},
+    bdy:   {kind:'circle',     cx:0,cy:0,r:1},
+    deriv: {kind:'diskClosed', cx:0,cy:0,r:1},
+    txtA:'閉円板 (境界を含む)', txtInt:'開円板 = A の内部', txtCl:'A 自身 (A は閉集合)', txtBdy:'単位円 S¹', txtDeriv:'閉円板 (cl(A) と一致)',
+    note:'A が閉集合だから cl(A) = A。内部は境界(単位円)を除いた開円板。'
+  },
+  {
+    key:'twoDisks', name:'2つの開円板の和 (交わらない)',
+    desc:'A = B°((−1.2, 0); 0.55) ∪ B°((1.2, 0); 0.55)',
+    A:    {kind:'union', items:[{kind:'diskOpen',cx:-1.2,cy:0,r:0.55},{kind:'diskOpen',cx:1.2,cy:0,r:0.55}]},
+    int:  {kind:'union', items:[{kind:'diskOpen',cx:-1.2,cy:0,r:0.55},{kind:'diskOpen',cx:1.2,cy:0,r:0.55}]},
+    cl:   {kind:'union', items:[{kind:'diskClosed',cx:-1.2,cy:0,r:0.55},{kind:'diskClosed',cx:1.2,cy:0,r:0.55}]},
+    bdy:  {kind:'union', items:[{kind:'circle',cx:-1.2,cy:0,r:0.55},{kind:'circle',cx:1.2,cy:0,r:0.55}]},
+    deriv:{kind:'union', items:[{kind:'diskClosed',cx:-1.2,cy:0,r:0.55},{kind:'diskClosed',cx:1.2,cy:0,r:0.55}]},
+    txtA:'2つの開円板の合併 (連結ではない)', txtInt:'A 自身 (開集合の和)', txtCl:'2つの閉円板の合併', txtBdy:'2本の円周', txtDeriv:'2つの閉円板の合併',
+    note:'開集合の任意個の和は開集合。閉包・境界・導集合は各円板で別々に取って合併すればよい。'
+  },
+  {
+    key:'punctured', name:'穴あき円板 B°(0,1) ∖ {0}',
+    desc:'A = { (x,y) : 0 < x² + y² < 1 } (原点を除く開円板)',
+    A:     {kind:'minusPoint', base:{kind:'diskOpen',cx:0,cy:0,r:1}, points:[[0,0]]},
+    int:   {kind:'minusPoint', base:{kind:'diskOpen',cx:0,cy:0,r:1}, points:[[0,0]]},
+    cl:    {kind:'diskClosed', cx:0,cy:0,r:1},
+    bdy:   {kind:'union', items:[{kind:'circle',cx:0,cy:0,r:1}, {kind:'point',x:0,y:0,filled:true}]},
+    deriv: {kind:'diskClosed', cx:0,cy:0,r:1},
+    txtA:'開円板から原点を取り除いた集合', txtInt:'A 自身 (A は開集合)', txtCl:'閉円板 (原点も加わる)', txtBdy:'単位円 ∪ {原点}', txtDeriv:'閉円板 (原点も A の集積点)',
+    note:'原点は A の点ではないが、A の点列 (1/n, 0) → (0,0) なので集積点。閉包に取り戻され、境界にも入る。'
+  },
+  {
+    key:'seqWithLimit', name:'収束列 + 極限点 {1/n} ∪ {0}',
+    desc:'A = { (1/n, 0) : n = 1, 2, 3, … } ∪ { (0, 0) }',
+    A:     {kind:'points', pts:[...seqPts(20),[0,0]], filled:true},
+    int:   {kind:'empty'},
+    cl:    {kind:'points', pts:[...seqPts(20),[0,0]], filled:true},
+    bdy:   {kind:'points', pts:[...seqPts(20),[0,0]], filled:true},
+    deriv: {kind:'point',  x:0, y:0, filled:true},
+    txtA:'可算個の孤立点 + 原点', txtInt:'∅ (内部点なし)', txtCl:'A 自身 (A は閉集合)', txtBdy:'A 全体 (内部が ∅ なので)', txtDeriv:'{(0, 0)} のみ (他は孤立点)',
+    note:'各 1/n は孤立点なので集積点ではない。原点だけが点列 1/n → 0 の収束先となり、集積点。A は閉集合(cl(A)=A)。'
+  },
+  {
+    key:'seqWithoutLimit', name:'収束列のみ {1/n} (極限を含まない)',
+    desc:'A = { (1/n, 0) : n = 1, 2, 3, … }',
+    A:     {kind:'points', pts:seqPts(20), filled:true},
+    int:   {kind:'empty'},
+    cl:    {kind:'points', pts:[...seqPts(20),[0,0]], filled:true},
+    bdy:   {kind:'points', pts:[...seqPts(20),[0,0]], filled:true},
+    deriv: {kind:'point',  x:0, y:0, filled:true},
+    txtA:'可算個の孤立点 (原点を含まない)', txtInt:'∅', txtCl:'A ∪ {(0, 0)} (原点が新たに加わる)', txtBdy:'A ∪ {(0, 0)}', txtDeriv:'{(0, 0)}',
+    note:'原点は A に属さないが集積点なので閉包に加わる。よって A は閉集合ではない。'
+  },
+  {
+    key:'dense', name:'稠密な部分集合 (有理点 in [0,1]²)',
+    desc:'A = { (x, y) ∈ [0,1]² : x, y ∈ ℚ }  (図では細かい点群で可視化)',
+    A:     {kind:'denseDots', x:0,y:0,w:1,h:1, step:0.07, frame:false},
+    int:   {kind:'empty'},
+    cl:    {kind:'denseDots', x:0,y:0,w:1,h:1, step:0.07, frame:true},
+    bdy:   {kind:'denseDots', x:0,y:0,w:1,h:1, step:0.07, frame:true},
+    deriv: {kind:'denseDots', x:0,y:0,w:1,h:1, step:0.07, frame:true},
+    txtA:'[0,1]² の有理座標点全体 (稠密)', txtInt:'∅', txtCl:'[0,1]² (閉正方形全体)', txtBdy:'[0,1]² (内部が ∅ なので)', txtDeriv:'[0,1]² (どの点も A の集積点)',
+    note:'稠密集合の典型。内部は空だが閉包は閉正方形全体。よって境界も全体、A′ も全体。'
+  },
+  {
+    key:'singleton', name:'1点集合 {(0, 0)}',
+    desc:'A = { (0, 0) }',
+    A:     {kind:'point', x:0,y:0, filled:true},
+    int:   {kind:'empty'},
+    cl:    {kind:'point', x:0,y:0, filled:true},
+    bdy:   {kind:'point', x:0,y:0, filled:true},
+    deriv: {kind:'empty'},
+    txtA:'1点だけからなる集合', txtInt:'∅', txtCl:'A 自身 (1点集合は閉)', txtBdy:'A 自身', txtDeriv:'∅ (孤立点。自分自身を「除いた」近傍に他の A の点がない)',
+    note:'孤立点の典型。導集合 A′ は自分を含まないことに注意 (A′ ⊂ cl(A) ∖ {自分} の点)。'
+  },
+];
+
+const PRESET = Object.fromEntries(PRESETS.map(p=>[p.key,p]));
+
+//---------------- 描画 ----------------
+function drawGrid(r){
+  ctx.strokeStyle = 'rgba(255,255,255,0.045)'; ctx.lineWidth = 1;
+  const wx0 = -Math.ceil(r.width/(2*S.view.scale)), wx1 = -wx0;
+  const wy0 = -Math.ceil(r.height/(2*S.view.scale)), wy1 = -wy0;
+  ctx.beginPath();
+  for (let gx=wx0; gx<=wx1; gx++){ const s=w2s(gx,0); ctx.moveTo(s[0],0); ctx.lineTo(s[0],r.height); }
+  for (let gy=wy0; gy<=wy1; gy++){ const s=w2s(0,gy); ctx.moveTo(0,s[1]); ctx.lineTo(r.width,s[1]); }
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  const o = w2s(0,0);
+  ctx.beginPath(); ctx.moveTo(o[0],0); ctx.lineTo(o[0],r.height); ctx.moveTo(0,o[1]); ctx.lineTo(r.width,o[1]); ctx.stroke();
+}
+
+function draw(){
+  const r = cv.parentElement.getBoundingClientRect();
+  ctx.clearRect(0,0,r.width,r.height);
+  drawGrid(r);
+  const p = PRESET[S.presetKey];
+  if (!p) return;
+  // 描画順: cl (薄塗り) → A → int → bdy → deriv (上に乗せる)
+  if (S.show.cl)    renderShape(p.cl,    'cl');
+  if (S.show.A)     renderShape(p.A,     'A');
+  if (S.show.int)   renderShape(p.int,   'int');
+  if (S.show.bdy)   renderShape(p.bdy,   'bdy');
+  if (S.show.deriv) renderShape(p.deriv, 'deriv');
+
+  // ステータス・式表示
+  document.getElementById('st-p').textContent = p.name;
+  document.getElementById('f-A').textContent     = p.txtA;
+  document.getElementById('f-int').textContent   = p.txtInt;
+  document.getElementById('f-cl').textContent    = p.txtCl;
+  document.getElementById('f-bdy').textContent   = p.txtBdy;
+  document.getElementById('f-deriv').textContent = p.txtDeriv;
+  document.getElementById('note').textContent    = p.desc + '   /   ' + p.note;
+}
+
+//---------------- UI ----------------
+function bindUI(){
+  const grid = document.getElementById('presets');
+  for (const p of PRESETS){
+    const b = document.createElement('button');
+    b.textContent = p.name; b.dataset.key = p.key;
+    if (p.key === S.presetKey) b.classList.add('active');
+    b.addEventListener('click', ()=>{
+      S.presetKey = p.key;
+      grid.querySelectorAll('button').forEach(x=>x.classList.toggle('active', x.dataset.key===p.key));
+      draw();
+    });
+    grid.appendChild(b);
+  }
+  const ids = [['opt-A','A'],['opt-int','int'],['opt-cl','cl'],['opt-bdy','bdy'],['opt-deriv','deriv']];
+  for (const [id,key] of ids){
+    document.getElementById(id).addEventListener('change', e=>{ S.show[key] = e.target.checked; draw(); });
+  }
+  window.addEventListener('resize', resize);
+}
+
+bindUI(); resize();
+</script>
+</body>
+</html>

@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>第2章 距離空間 — さまざまな距離による開球</title>
+<style>
+  :root { --bg:#0e1116; --panel:#161b22; --panel2:#1c232d; --border:#2a323d;
+          --text:#d6dde6; --muted:#8b97a6; --accent:#4ea1ff; --accent2:#ffb454; --good:#5ad19a;
+          --c1:#ef6a6a; --c2:#4ea1ff; --c8:#5ad19a; --cp:#c486ff; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; height:100%; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; }
+  #app { display:flex; height:100vh; overflow:hidden; }
+  #stage { flex:1; position:relative; min-width:0; }
+  canvas { display:block; width:100%; height:100%; background:radial-gradient(circle at 50% 45%,#131a24 0%,#0e1116 72%); cursor:crosshair; }
+  #sidebar { width:340px; flex:0 0 340px; background:var(--panel); border-left:1px solid var(--border);
+    overflow-y:auto; padding:14px 16px 40px; font-size:13px; }
+  h1 { font-size:15px; margin:0 0 2px; letter-spacing:.02em; }
+  .nav { font-size:11px; margin:0 0 10px; }
+  .nav a { color:var(--accent); text-decoration:none; }
+  .nav a:hover { text-decoration:underline; }
+  .sub { color:var(--muted); font-size:11.5px; margin:0 0 12px; line-height:1.5; }
+  .group { background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:12px; }
+  .group h2 { font-size:12px; margin:0 0 10px; color:var(--accent); font-weight:600; }
+  .metricRow { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .metricRow button { background:#233040; color:var(--text); border:1px solid var(--border); border-radius:8px;
+    padding:7px 6px; font-size:12px; cursor:pointer; font-family:inherit; }
+  .metricRow button:hover { background:#2c3c50; }
+  .metricRow button.active { background:var(--accent); color:#05101e; border-color:var(--accent); font-weight:600; }
+  label.row { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:9px 0; }
+  label.row span.lab { color:var(--muted); flex:0 0 auto; min-width:80px; }
+  label.row span.val { color:var(--text); font-variant-numeric:tabular-nums; min-width:48px; text-align:right; }
+  input[type=range] { flex:1; accent-color:var(--accent); }
+  input[type=range]:disabled { opacity:.4; }
+  .check { display:flex; align-items:center; gap:8px; margin:8px 0; cursor:pointer; }
+  .check input { accent-color:var(--accent); width:15px; height:15px; }
+  .legendRow { display:flex; align-items:center; gap:8px; font-size:11.5px; margin:4px 0; color:var(--muted); }
+  .swatch { width:14px; height:14px; border-radius:3px; display:inline-block; }
+  .hint { color:var(--muted); font-size:11.5px; line-height:1.55; margin-top:6px; }
+  .hint b { color:var(--text); }
+  code, .formula { background:#0e1116; padding:1px 6px; border-radius:4px; color:var(--accent2); font-size:11.5px; }
+  .warn { color:#ffc56c; font-size:11px; margin-top:6px; }
+  #status { position:absolute; top:14px; left:16px; font-size:12px; color:var(--muted);
+    background:rgba(14,17,22,.7); padding:6px 10px; border-radius:8px; border:1px solid var(--border);
+    pointer-events:none; backdrop-filter:blur(4px); }
+  #status b { color:var(--accent2); }
+  #help { position:absolute; bottom:12px; left:16px; font-size:11px; color:var(--muted);
+    background:rgba(14,17,22,.6); padding:5px 9px; border-radius:7px; pointer-events:none; }
+  button.wide { width:100%; background:#233040; color:var(--text); border:1px solid var(--border); border-radius:8px;
+    padding:7px; font-size:12px; cursor:pointer; font-family:inherit; }
+  button.wide:hover { background:#2c3c50; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="status">距離 <b id="st-m">L²</b> &nbsp;/&nbsp; 半径 r = <b id="st-r">1.00</b> &nbsp;/&nbsp; 中心 (<b id="st-cx">0.00</b>, <b id="st-cy">0.00</b>)</div>
+    <div id="help">キャンバスをクリックで中心を移動 / ドラッグでも追従</div>
+  </div>
+  <div id="sidebar">
+    <h1>第2章 距離空間 — 開球</h1>
+    <p class="nav">▸ <a href="index.html">索引へ戻る</a></p>
+    <p class="sub">ℝ² 上で、選んだ距離 d による <b>開球</b> B<sub>r</sub>(c) = { x ∈ ℝ² : d(c, x) &lt; r } の形を可視化します。中心 c、半径 r、距離の種類を自由に変えられます。</p>
+
+    <div class="group">
+      <h2>距離の選択</h2>
+      <div class="metricRow">
+        <button data-metric="1">L¹ (Manhattan)</button>
+        <button data-metric="2" class="active">L² (Euclidean)</button>
+        <button data-metric="inf">L∞ (Chebyshev)</button>
+        <button data-metric="p">Lᵖ (任意 p)</button>
+      </div>
+      <label class="row"><span class="lab">指数 p</span>
+        <input id="p" type="range" min="0.5" max="8.0" step="0.05" value="3.0" disabled>
+        <span class="val" id="p-v">3.00</span></label>
+      <div id="warnP" class="warn" style="display:none">⚠ p &lt; 1 では三角不等式が成り立たず距離ではありません (図示のみ・球は凹む)。</div>
+    </div>
+
+    <div class="group">
+      <h2>パラメータ</h2>
+      <label class="row"><span class="lab">半径 r</span>
+        <input id="r" type="range" min="0.20" max="2.50" step="0.02" value="1.00">
+        <span class="val" id="r-v">1.00</span></label>
+      <button id="resetCenter" class="wide">中心を原点に戻す</button>
+    </div>
+
+    <div class="group">
+      <h2>表示</h2>
+      <label class="check"><input type="checkbox" id="opt-compare"> L¹・L²・L∞ を重ね描き(比較)</label>
+      <label class="check"><input type="checkbox" id="opt-levels" checked> 等距離曲線 (r/4, r/2, 3r/4)</label>
+      <label class="check"><input type="checkbox" id="opt-fill" checked> 内部を塗る</label>
+      <label class="check"><input type="checkbox" id="opt-grid" checked> 格子・座標軸を表示</label>
+      <div class="legendRow"><span class="swatch" style="background:#ef6a6a"></span>L¹ &nbsp;
+        <span class="swatch" style="background:#4ea1ff"></span>L² &nbsp;
+        <span class="swatch" style="background:#5ad19a"></span>L∞ &nbsp;
+        <span class="swatch" style="background:#c486ff"></span>Lᵖ</div>
+    </div>
+
+    <div class="group">
+      <h2>定義と要点</h2>
+      <p class="hint">距離の比較(本講では 1 ≤ p ≤ ∞):</p>
+      <ul class="hint" style="padding-left:1.1em">
+        <li>L¹: d<sub>1</sub>(x, y) = |x₁−y₁| + |x₂−y₂| → 開球は<b>菱形</b></li>
+        <li>L²: d<sub>2</sub>(x, y) = √((x₁−y₁)² + (x₂−y₂)²) → <b>円</b></li>
+        <li>L<sup>∞</sup>: d<sub>∞</sub>(x, y) = max(|x₁−y₁|, |x₂−y₂|) → <b>正方形</b></li>
+        <li>L<sup>p</sup>: d<sub>p</sub>(x, y) = (Σ |x<sub>i</sub>−y<sub>i</sub>|<sup>p</sup>)<sup>1/p</sup></li>
+      </ul>
+      <p class="hint"><b>大事なポイント</b>: ℝⁿ 上の L<sup>p</sup> 距離 (1 ≤ p ≤ ∞) は<b>すべて同じ位相</b>を定めます。形は違っても、どの L<sup>p</sup> 球も他の L<sup>q</sup> 球と互いに入れ子にできるため、開集合の集まり(=位相)は同じです。「比較」をオンにすると同じ r で形だけ変わる様子が見えます。</p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+//==================================================================
+// 第2章 距離空間 — Lᵖ 開球のビジュアライザ
+//==================================================================
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+
+const S = {
+  metric: '2',         // '1' | '2' | 'inf' | 'p'
+  p: 3.0,
+  r: 1.00,
+  cx: 0, cy: 0,
+  compare: false, levels: true, fill: true, grid: true,
+  view: { scale: 100, ox: 0, oy: 0 },   // world→screen
+  dragging: false,
+};
+
+const COL = { L1:'#ef6a6a', L2:'#4ea1ff', Linf:'#5ad19a', Lp:'#c486ff' };
+
+function curColor(){ return S.metric==='1'?COL.L1: S.metric==='2'?COL.L2: S.metric==='inf'?COL.Linf: COL.Lp; }
+function curLabel(){ return S.metric==='1'?'L¹': S.metric==='2'?'L²': S.metric==='inf'?'L∞': ('L^'+S.p.toFixed(2)); }
+
+//---------------- ビュー ----------------
+function resize(){
+  const r = cv.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio||1;
+  cv.width = Math.floor(r.width*dpr); cv.height = Math.floor(r.height*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const m = Math.min(r.width, r.height);
+  S.view.scale = m/6.4;     // ワールド ±3 が収まる
+  S.view.ox = r.width/2; S.view.oy = r.height/2;
+  draw();
+}
+function w2s(x,y){ return [S.view.ox + x*S.view.scale, S.view.oy - y*S.view.scale]; }
+function s2w(sx,sy){ return [(sx-S.view.ox)/S.view.scale, -(sy-S.view.oy)/S.view.scale]; }
+
+//---------------- 開球の境界（多角形サンプル） ----------------
+// 中心(cx,cy)、半径 r、距離指数 p で、境界 d_p((cx,cy),(x,y))=r のサンプル点列
+function ballBoundary(cx, cy, r, kind, p){
+  const N = 256, pts = new Array(N);
+  for (let i=0; i<N; i++){
+    const th = 2*Math.PI*i/N;
+    const c = Math.cos(th), s = Math.sin(th);
+    let rr;
+    if (kind==='inf'){ rr = r / Math.max(Math.abs(c), Math.abs(s)); }
+    else {
+      const q = (kind==='1')?1 : (kind==='2')?2 : (kind==='p'?p:2);
+      // |c|^q + |s|^q = (r/rr)^q  →  rr = r / (|c|^q+|s|^q)^{1/q}
+      rr = r / Math.pow(Math.pow(Math.abs(c),q)+Math.pow(Math.abs(s),q), 1/q);
+    }
+    pts[i] = [cx + rr*c, cy + rr*s];
+  }
+  return pts;
+}
+
+//---------------- 描画 ----------------
+function drawGrid(r){
+  if (!S.grid) return;
+  ctx.strokeStyle = 'rgba(255,255,255,0.045)'; ctx.lineWidth = 1;
+  const wTL = s2w(0,0), wBR = s2w(r.width, r.height);
+  const x0 = Math.ceil(wTL[0]-1), x1 = Math.floor(wBR[0]+1);
+  const y0 = Math.ceil(wBR[1]-1), y1 = Math.floor(wTL[1]+1);
+  ctx.beginPath();
+  for (let gx=x0; gx<=x1; gx++){ const s=w2s(gx,0); ctx.moveTo(s[0],0); ctx.lineTo(s[0],r.height); }
+  for (let gy=y0; gy<=y1; gy++){ const s=w2s(0,gy); ctx.moveTo(0,s[1]); ctx.lineTo(r.width,s[1]); }
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  const o = w2s(0,0);
+  ctx.beginPath(); ctx.moveTo(o[0],0); ctx.lineTo(o[0],r.height); ctx.moveTo(0,o[1]); ctx.lineTo(r.width,o[1]); ctx.stroke();
+}
+function drawPolyOutline(pts, color, lw){
+  ctx.strokeStyle = color; ctx.lineWidth = lw;
+  ctx.beginPath();
+  const s0 = w2s(pts[0][0], pts[0][1]); ctx.moveTo(s0[0], s0[1]);
+  for (let i=1; i<pts.length; i++){ const s=w2s(pts[i][0], pts[i][1]); ctx.lineTo(s[0], s[1]); }
+  ctx.closePath(); ctx.stroke();
+}
+function drawPolyFill(pts, fillColor){
+  ctx.fillStyle = fillColor;
+  ctx.beginPath();
+  const s0 = w2s(pts[0][0], pts[0][1]); ctx.moveTo(s0[0], s0[1]);
+  for (let i=1; i<pts.length; i++){ const s=w2s(pts[i][0], pts[i][1]); ctx.lineTo(s[0], s[1]); }
+  ctx.closePath(); ctx.fill();
+}
+function hexToRgba(hex, a){
+  const h = hex.replace('#','');
+  const R = parseInt(h.substring(0,2),16), G = parseInt(h.substring(2,4),16), B = parseInt(h.substring(4,6),16);
+  return `rgba(${R},${G},${B},${a})`;
+}
+
+function draw(){
+  const r = cv.parentElement.getBoundingClientRect();
+  ctx.clearRect(0,0,r.width,r.height);
+  drawGrid(r);
+
+  if (S.compare){
+    // L1, L2, Linf の境界を同じ r で重ね描き（塗りは薄く）
+    const list = [
+      {kind:'1',   col:COL.L1},
+      {kind:'2',   col:COL.L2},
+      {kind:'inf', col:COL.Linf},
+    ];
+    if (S.metric==='p') list.push({kind:'p', col:COL.Lp});
+    for (const it of list){
+      const pts = ballBoundary(S.cx, S.cy, S.r, it.kind, S.p);
+      if (S.fill) drawPolyFill(pts, hexToRgba(it.col, 0.10));
+      drawPolyOutline(pts, it.col, 2.0);
+    }
+  } else {
+    const col = curColor();
+    // 等距離曲線（小さい半径）
+    if (S.levels){
+      for (const f of [0.25, 0.5, 0.75]){
+        const pts = ballBoundary(S.cx, S.cy, S.r*f, S.metric, S.p);
+        drawPolyOutline(pts, hexToRgba(col, 0.45), 1.0);
+      }
+    }
+    const pts = ballBoundary(S.cx, S.cy, S.r, S.metric, S.p);
+    if (S.fill) drawPolyFill(pts, hexToRgba(col, 0.18));
+    drawPolyOutline(pts, col, 2.4);
+  }
+
+  // 中心点マーカー
+  const c = w2s(S.cx, S.cy);
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(c[0], c[1], 3.5, 0, 2*Math.PI); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 1; ctx.stroke();
+
+  // ステータス
+  document.getElementById('st-m').textContent = curLabel();
+  document.getElementById('st-r').textContent = S.r.toFixed(2);
+  document.getElementById('st-cx').textContent = S.cx.toFixed(2);
+  document.getElementById('st-cy').textContent = S.cy.toFixed(2);
+}
+
+//---------------- UI ----------------
+function setMetric(m){
+  S.metric = m;
+  document.querySelectorAll('.metricRow button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.metric===m);
+  });
+  const pInput = document.getElementById('p');
+  pInput.disabled = (m!=='p');
+  document.getElementById('warnP').style.display = (m==='p' && S.p<1) ? '' : 'none';
+  draw();
+}
+function bindUI(){
+  document.querySelectorAll('.metricRow button').forEach(b=>{
+    b.addEventListener('click', ()=>setMetric(b.dataset.metric));
+  });
+  const pIn = document.getElementById('p');
+  pIn.addEventListener('input', ()=>{
+    S.p = parseFloat(pIn.value);
+    document.getElementById('p-v').textContent = S.p.toFixed(2);
+    document.getElementById('warnP').style.display = (S.metric==='p' && S.p<1) ? '' : 'none';
+    draw();
+  });
+  const rIn = document.getElementById('r');
+  rIn.addEventListener('input', ()=>{
+    S.r = parseFloat(rIn.value);
+    document.getElementById('r-v').textContent = S.r.toFixed(2);
+    draw();
+  });
+  document.getElementById('resetCenter').addEventListener('click', ()=>{ S.cx=0; S.cy=0; draw(); });
+  document.getElementById('opt-compare').addEventListener('change', e=>{ S.compare = e.target.checked; draw(); });
+  document.getElementById('opt-levels').addEventListener('change',  e=>{ S.levels  = e.target.checked; draw(); });
+  document.getElementById('opt-fill').addEventListener('change',    e=>{ S.fill    = e.target.checked; draw(); });
+  document.getElementById('opt-grid').addEventListener('change',    e=>{ S.grid    = e.target.checked; draw(); });
+  window.addEventListener('resize', resize);
+
+  // クリック/ドラッグで中心移動
+  function setCenterFromEvent(e){
+    const rect = cv.getBoundingClientRect();
+    const [wx, wy] = s2w(e.clientX-rect.left, e.clientY-rect.top);
+    S.cx = wx; S.cy = wy; draw();
+  }
+  cv.addEventListener('pointerdown', e=>{ S.dragging=true; cv.setPointerCapture(e.pointerId); setCenterFromEvent(e); });
+  cv.addEventListener('pointermove', e=>{ if(S.dragging) setCenterFromEvent(e); });
+  cv.addEventListener('pointerup', ()=>{ S.dragging=false; });
+}
+
+bindUI(); resize();
+</script>
+</body>
+</html>
