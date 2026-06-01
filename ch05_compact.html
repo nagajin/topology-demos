@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>第5章 コンパクト性 — Heine–Borel 体験</title>
+<style>
+  :root { --bg:#0e1116; --panel:#161b22; --panel2:#1c232d; --border:#2a323d;
+          --text:#d6dde6; --muted:#8b97a6; --accent:#4ea1ff; --accent2:#ffb454;
+          --good:#5ad19a; --bad:#ef6a6a; --cTarget:#4ea1ff; --cCov:#5ad19a; --cUnc:#ef6a6a;
+          --cPal:#ffd24a; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; height:100%; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; }
+  #app { display:flex; height:100vh; overflow:hidden; }
+  #stage { flex:1; position:relative; min-width:0; }
+  canvas { display:block; width:100%; height:100%; background:radial-gradient(circle at 50% 45%,#131a24 0%,#0e1116 72%); }
+  #sidebar { width:340px; flex:0 0 340px; background:var(--panel); border-left:1px solid var(--border);
+    overflow-y:auto; padding:14px 16px 40px; font-size:13px; }
+  h1 { font-size:15px; margin:0 0 2px; }
+  .nav { font-size:11px; margin:0 0 10px; }
+  .nav a { color:var(--accent); text-decoration:none; }
+  .nav a:hover { text-decoration:underline; }
+  .sub { color:var(--muted); font-size:11.5px; margin:0 0 12px; line-height:1.5; }
+  .group { background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:12px; }
+  .group h2 { font-size:12px; margin:0 0 10px; color:var(--accent); font-weight:600; }
+  .presetGrid { display:grid; grid-template-columns:1fr; gap:5px; }
+  .presetGrid button { background:#233040; color:var(--text); border:1px solid var(--border); border-radius:7px;
+    padding:7px 9px; font-size:12px; cursor:pointer; font-family:inherit; text-align:left; }
+  .presetGrid button:hover { background:#2c3c50; }
+  .presetGrid button.active { background:var(--accent); color:#05101e; border-color:var(--accent); font-weight:600; }
+  label.row { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:9px 0; }
+  label.row span.lab { color:var(--muted); flex:0 0 auto; min-width:80px; }
+  label.row span.val { color:var(--text); font-variant-numeric:tabular-nums; min-width:48px; text-align:right; }
+  input[type=range] { flex:1; accent-color:var(--accent); }
+  input[type=range]:disabled { opacity:.4; }
+  button.wide { width:100%; background:#233040; color:var(--text); border:1px solid var(--border); border-radius:8px;
+    padding:8px; font-size:13px; cursor:pointer; font-family:inherit; }
+  button.wide:hover { background:#2c3c50; }
+  button.wide.primary { background:var(--accent); color:#05101e; border-color:var(--accent); font-weight:600; }
+  button.wide.primary.active { background:var(--accent2); color:#2a1c05; border-color:var(--accent2); }
+  .res { font-variant-numeric:tabular-nums; line-height:1.7; }
+  .res .row { display:flex; justify-content:space-between; }
+  .res .row span:first-child { color:var(--muted); }
+  .res .ok { color:var(--good); font-weight:600; }
+  .res .bad { color:var(--bad); font-weight:600; }
+  .hint { color:var(--muted); font-size:11.5px; line-height:1.6; }
+  .hint b { color:var(--text); }
+  code { background:#0e1116; padding:1px 6px; border-radius:4px; color:var(--accent2); font-size:11.5px; }
+  .legendRow { display:flex; align-items:center; gap:6px; font-size:11.5px; margin:4px 0; color:var(--muted); }
+  .sw { width:14px; height:10px; border-radius:2px; display:inline-block; }
+  #status { position:absolute; top:14px; left:16px; font-size:12px; color:var(--muted);
+    background:rgba(14,17,22,.7); padding:6px 10px; border-radius:8px; border:1px solid var(--border);
+    pointer-events:none; backdrop-filter:blur(4px); }
+  #status b { color:var(--accent2); }
+  #verdictBar { position:absolute; top:14px; right:16px; font-size:12.5px; font-weight:600;
+    background:rgba(14,17,22,.78); padding:7px 12px; border-radius:8px; border:1px solid var(--border);
+    pointer-events:none; backdrop-filter:blur(4px); }
+  #note { position:absolute; bottom:12px; left:16px; right:24px; max-width:700px;
+    font-size:12px; color:var(--text); background:rgba(14,17,22,.78); padding:8px 12px;
+    border-radius:8px; border:1px solid var(--border); pointer-events:none; line-height:1.55; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="status">シナリオ: <b id="st-s">[0,1] の被覆</b></div>
+    <div id="verdictBar">—</div>
+    <div id="note">—</div>
+  </div>
+  <div id="sidebar">
+    <h1>第5章 コンパクト性 — Heine–Borel</h1>
+    <p class="nav">▸ <a href="index.html">索引へ戻る</a></p>
+    <p class="sub">部分集合 X が<b>コンパクト</b> ⇔ X の任意の開被覆は有限部分被覆を持つ。<br>有限部分被覆が取れる/取れない様子を、開区間の族を増やしながら見比べます。</p>
+
+    <div class="group">
+      <h2>シナリオ</h2>
+      <div class="presetGrid" id="scenarios"></div>
+    </div>
+
+    <div class="group">
+      <h2>パラメータ</h2>
+      <label class="row"><span class="lab">N (被覆の個数)</span>
+        <input id="N" type="range" min="1" max="60" step="1" value="10">
+        <span class="val" id="N-v">10</span></label>
+      <button id="auto" class="wide">⏵ N を増やしてアニメ</button>
+    </div>
+
+    <div class="group">
+      <h2>結果</h2>
+      <div class="res">
+        <div class="row"><span>使用した被覆の数</span><span id="r-N">—</span></div>
+        <div class="row"><span>被覆が達した範囲</span><span id="r-cov">—</span></div>
+        <div class="row"><span>未被覆部分</span><span id="r-unc">—</span></div>
+        <div class="row"><span>判定</span><span id="r-v">—</span></div>
+      </div>
+      <div class="legendRow" style="margin-top:8px"><span class="sw" style="background:rgba(78,161,255,0.9)"></span>対象集合 X</div>
+      <div class="legendRow"><span class="sw" style="background:rgba(90,209,154,0.85)"></span>被覆できている部分</div>
+      <div class="legendRow"><span class="sw" style="background:rgba(239,106,106,0.85)"></span>未被覆部分</div>
+      <div class="legendRow"><span class="sw" style="background:rgba(255,210,74,0.55)"></span>各開区間 (被覆)</div>
+    </div>
+
+    <div class="group">
+      <h2>定義と要点</h2>
+      <p class="hint">$X$ が<b>コンパクト</b> ⇔ $X$ の任意の開被覆 $\{U_\lambda\}$ から有限部分被覆 $U_{\lambda_1},\ldots,U_{\lambda_n}$ が取れる。</p>
+      <p class="hint" style="margin-top:6px"><b>Heine–Borel の定理</b> (ℝⁿ): 部分集合がコンパクト ⇔ <b>有界かつ閉</b>。<br>したがって <b>[0,1] はコンパクト</b>、(0,1) は閉でないので非コンパクト、ℝ は有界でないので非コンパクト。</p>
+      <p class="hint" style="margin-top:6px"><b>非コンパクトの典型例</b>:<br>
+      ・(0,1) の被覆 $\{(1/n, 1)\}_{n=2}^{\infty}$ — 有限個では (0, 1/(N+1)] が残る<br>
+      ・ℝ の被覆 $\{(-n, n)\}_{n=1}^{\infty}$ — 有限個では |x| &gt; N が残る</p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+//==================================================================
+// 第5章 コンパクト性 — Heine–Borel 体験
+//==================================================================
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+
+const S = {
+  scenarioKey: 'finite01',
+  N: 10,
+  auto: false,
+  autoLast: 0,
+  view: { xMin:-0.2, xMax:1.2, sx:0, ox:0 },
+};
+
+//---------------- シナリオ ----------------
+const SCENARIOS = [
+  {
+    key:'finite01',
+    name:'[0,1] の典型的な開被覆 (有限で完了)',
+    target:{ kind:'closed', a:0, b:1, viewMin:-0.25, viewMax:1.25 },
+    cover:{ kind:'fixed', list:[[-0.05,0.30],[0.20,0.55],[0.45,0.80],[0.70,1.05],[-0.10,0.10]] },
+    showN:false,
+    verdictCompact:true,
+    msg:'[0,1] はコンパクト (Heine–Borel)。この 5 つの開区間で完全に覆える。実際、[0,1] の任意の開被覆は有限部分被覆を持つ。'
+  },
+  {
+    key:'inv1nOpen',
+    name:'(0,1) の被覆 ⋃ (1/n, 1) — 有限では覆えない',
+    target:{ kind:'open', a:0, b:1, viewMin:-0.05, viewMax:1.10 },
+    cover:{ kind:'parametric', fn:(i,N)=>[1/(i+2), 1], color:'orbit' },   // n=2..N+1
+    showN:true, Nmin:1, Nmax:60, Ndefault:10,
+    verdictCompact:false,
+    msg:'(0,1) はコンパクトでない。N をいくら大きくしても (0, 1/(N+1)] が未被覆として残る。原点 0 はこの被覆では「届かない」端点 — (0,1) が閉でないことに対応。'
+  },
+  {
+    key:'inv1nClosed',
+    name:'[0,1] を同じ族で覆おうとすると…(0 が決して覆えない!)',
+    target:{ kind:'closed', a:0, b:1, viewMin:-0.05, viewMax:1.10 },
+    cover:{ kind:'parametric', fn:(i,N)=>[1/(i+2), 1], color:'orbit' },
+    showN:true, Nmin:1, Nmax:60, Ndefault:10,
+    verdictCompact:true,
+    msg:'この被覆族は [0,1] を覆っていない ((1/n, 1) の和は 0 を含まない)。つまり「[0,1] の開被覆」ではない。すなわち Heine–Borel との矛盾はない — コンパクト性は「任意の開被覆」に対する主張だから。'
+  },
+  {
+    key:'negNNR',
+    name:'ℝ の被覆 ⋃ (−n, n) — 有限では覆えない',
+    target:{ kind:'all', viewMin:-7, viewMax:7 },
+    cover:{ kind:'parametric', fn:(i,N)=>[-(i+1), i+1], color:'orbit' },
+    showN:true, Nmin:1, Nmax:7, Ndefault:3,
+    verdictCompact:false,
+    msg:'ℝ はコンパクトでない。任意有限個の (−n, n) の和は (−N, N) にとどまり、|x| ≥ N の点は未被覆。'
+  },
+  {
+    key:'randDense01',
+    name:'[0,1] の密な小さい区間群 (有限で必ず覆える)',
+    target:{ kind:'closed', a:0, b:1, viewMin:-0.05, viewMax:1.05 },
+    cover:{ kind:'parametric', fn:(i,N)=>{
+      // i 番目: [i/N - 0.06, i/N + 0.06] (端点も少しはみ出る)
+      const x = i/(N-1 < 1 ? 1 : N-1);
+      return [x - 0.08, x + 0.08];
+    }, color:'rainbow' },
+    showN:true, Nmin:3, Nmax:40, Ndefault:9,
+    verdictCompact:true,
+    msg:'どんなに細かい開被覆でも、[0,1] からは有限部分被覆が取れる (Heine–Borel)。N を増やすと無駄が増えるが、N=9 程度で既に完備に覆える。'
+  },
+];
+const SCN = Object.fromEntries(SCENARIOS.map(s=>[s.key,s]));
+
+//---------------- 区間処理 ----------------
+function mergeIntervals(ivs){
+  if (!ivs.length) return [];
+  const a = ivs.map(x=>x.slice()).sort((p,q)=>p[0]-q[0]);
+  const out = [a[0].slice()];
+  for (let i=1;i<a.length;i++){
+    const last = out[out.length-1];
+    if (a[i][0] <= last[1]) last[1] = Math.max(last[1], a[i][1]);
+    else out.push(a[i].slice());
+  }
+  return out;
+}
+function subtractFromTarget(target, union){
+  // target を [tLo, tHi] (端境を含むかは表示上のみ)
+  let tLo, tHi;
+  const HUGE = 1e6;
+  if (target.kind === 'all'){ tLo = -HUGE; tHi = HUGE; }
+  else { tLo = target.a; tHi = target.b; }
+  let uncov = [[tLo, tHi]];
+  for (const [c,d] of union){
+    const nxt = [];
+    for (const [x,y] of uncov){
+      if (d <= x || c >= y){ nxt.push([x,y]); continue; }
+      if (c > x) nxt.push([x, c]);
+      if (d < y) nxt.push([d, y]);
+    }
+    uncov = nxt;
+  }
+  return uncov;
+}
+
+//---------------- ビュー ----------------
+function setViewFromScenario(){
+  const sc = SCN[S.scenarioKey];
+  S.view.xMin = sc.target.viewMin;
+  S.view.xMax = sc.target.viewMax;
+  resize();
+}
+function resize(){
+  const r = cv.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio||1;
+  cv.width = Math.floor(r.width*dpr); cv.height = Math.floor(r.height*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const margin = 60;
+  S.view.sx = (r.width - 2*margin) / (S.view.xMax - S.view.xMin);
+  S.view.ox = margin - S.view.xMin * S.view.sx;
+  draw();
+}
+function w2sx(x){ return S.view.ox + x*S.view.sx; }
+
+//---------------- 色 ----------------
+function coverColor(i, N){
+  // 順序によって色相を回す
+  const h = (i*47 + 30) % 360;
+  return `hsl(${h}, 75%, 65%)`;
+}
+function hexToRgba(hex,a){ const h=hex.replace('#',''); return `rgba(${parseInt(h.substring(0,2),16)},${parseInt(h.substring(2,4),16)},${parseInt(h.substring(4,6),16)},${a})`; }
+
+//---------------- 描画 ----------------
+function drawAxis(r){
+  const y0 = r.height * 0.62;     // 軸の y 位置
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(20, y0); ctx.lineTo(r.width-20, y0); ctx.stroke();
+  // 目盛り
+  ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+  const span = S.view.xMax - S.view.xMin;
+  const tickStep = span > 5 ? 1 : (span > 1.5 ? 0.5 : 0.1);
+  for (let x = Math.ceil(S.view.xMin/tickStep)*tickStep; x <= S.view.xMax; x += tickStep){
+    const sx = w2sx(x);
+    if (sx < 25 || sx > r.width-15) continue;
+    ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(sx, y0-4); ctx.lineTo(sx, y0+4); ctx.stroke();
+    ctx.fillText(Math.abs(x)<0.001?'0':(+x.toFixed(2)).toString(), sx, y0+18);
+  }
+  return y0;
+}
+
+function drawTargetAt(target, y0, r){
+  ctx.lineWidth = 7;
+  ctx.lineCap = 'butt';
+  let a, b;
+  if (target.kind === 'all'){
+    a = S.view.xMin + 0.05*(S.view.xMax-S.view.xMin);
+    b = S.view.xMax - 0.05*(S.view.xMax-S.view.xMin);
+    // 端点に矢印（無限大）
+    ctx.strokeStyle = 'rgba(78,161,255,0.85)';
+    ctx.beginPath(); ctx.moveTo(w2sx(a), y0); ctx.lineTo(w2sx(b), y0); ctx.stroke();
+    // 矢印
+    ctx.fillStyle = 'rgba(78,161,255,0.85)';
+    const ah = 9;
+    for (const [x, dir] of [[a,-1],[b,+1]]){
+      const sx = w2sx(x);
+      ctx.beginPath();
+      ctx.moveTo(sx + dir*ah, y0);
+      ctx.lineTo(sx, y0 - ah*0.7);
+      ctx.lineTo(sx, y0 + ah*0.7);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(78,161,255,0.85)';
+    ctx.textAlign='right'; ctx.font='12px sans-serif';
+    ctx.fillText('−∞', w2sx(a)-12, y0-10);
+    ctx.textAlign='left'; ctx.fillText('+∞', w2sx(b)+12, y0-10);
+  } else {
+    a = target.a; b = target.b;
+    ctx.strokeStyle = 'rgba(78,161,255,0.95)';
+    ctx.beginPath(); ctx.moveTo(w2sx(a), y0); ctx.lineTo(w2sx(b), y0); ctx.stroke();
+    // 端点の丸 (closed=塗り、open=中空)
+    const closed = (target.kind === 'closed');
+    drawEndpoint(w2sx(a), y0, closed);
+    drawEndpoint(w2sx(b), y0, closed);
+    // ラベル
+    ctx.fillStyle = 'rgba(255,255,255,0.65)'; ctx.font='12px sans-serif'; ctx.textAlign='center';
+    ctx.fillText((closed?'[':'(')+a+(closed?']':')'), w2sx(a), y0-14);
+    ctx.fillText((closed?'[':'(')+b+(closed?']':')'), w2sx(b), y0-14);
+  }
+  return { a, b };
+}
+function drawEndpoint(sx, sy, filled){
+  ctx.beginPath(); ctx.arc(sx, sy, 5.5, 0, 2*Math.PI);
+  if (filled){ ctx.fillStyle='rgba(78,161,255,0.95)'; ctx.fill(); }
+  else { ctx.fillStyle='#0e1116'; ctx.fill(); ctx.lineWidth=1.8; ctx.strokeStyle='rgba(78,161,255,0.95)'; ctx.stroke(); }
+}
+
+function drawCoverIntervals(covers, y0){
+  // 各被覆を y0 より上方に階段状に並べる
+  const top = 24;
+  const bottom = y0 - 18;
+  const Nv = covers.length;
+  const h = Math.min(14, (bottom - top) / Math.max(1, Nv));
+  const lw = Math.max(3, Math.min(10, h - 2));
+  for (let i=0; i<Nv; i++){
+    const y = bottom - h*(i+0.5);
+    const [a,b] = covers[i];
+    const sa = Math.max(20, w2sx(a));
+    const sb = Math.min(cv.parentElement.getBoundingClientRect().width-20, w2sx(b));
+    if (sb <= sa) continue;
+    ctx.strokeStyle = coverColor(i, Nv);
+    ctx.lineWidth = lw; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(sa, y); ctx.lineTo(sb, y); ctx.stroke();
+  }
+}
+
+function drawCoveredOnTarget(union, target, y0){
+  ctx.lineWidth = 13; ctx.lineCap = 'butt';
+  ctx.strokeStyle = 'rgba(90,209,154,0.85)';
+  let tA, tB;
+  if (target.kind === 'all'){ tA = S.view.xMin; tB = S.view.xMax; }
+  else { tA = target.a; tB = target.b; }
+  for (const [c,d] of union){
+    const ca = Math.max(c, tA), cb = Math.min(d, tB);
+    if (cb <= ca) continue;
+    ctx.beginPath(); ctx.moveTo(w2sx(ca), y0); ctx.lineTo(w2sx(cb), y0); ctx.stroke();
+  }
+}
+function drawUncovered(uncov, y0){
+  ctx.lineWidth = 9; ctx.lineCap = 'butt';
+  ctx.strokeStyle = 'rgba(239,106,106,0.95)';
+  for (const [c,d] of uncov){
+    if (!isFinite(c) || !isFinite(d)) continue;
+    const sa = Math.max(15, w2sx(c)), sb = Math.min(cv.parentElement.getBoundingClientRect().width-15, w2sx(d));
+    if (sb <= sa + 0.3) continue;
+    ctx.beginPath(); ctx.moveTo(sa, y0).lineTo ? null : null;
+    ctx.beginPath(); ctx.moveTo(sa, y0); ctx.lineTo(sb, y0); ctx.stroke();
+  }
+}
+
+function draw(){
+  const r = cv.parentElement.getBoundingClientRect();
+  ctx.clearRect(0,0,r.width,r.height);
+  const sc = SCN[S.scenarioKey];
+
+  const y0 = drawAxis(r);
+  // 1) 対象集合
+  drawTargetAt(sc.target, y0, r);
+
+  // 2) 被覆の生成
+  const N = sc.showN ? S.N : (sc.cover.list ? sc.cover.list.length : 1);
+  const covers = [];
+  if (sc.cover.kind === 'fixed'){
+    for (const I of sc.cover.list) covers.push(I.slice());
+  } else {
+    for (let i=0; i<N; i++) covers.push(sc.cover.fn(i, N));
+  }
+
+  // 3) 被覆区間（上に並べて表示）
+  drawCoverIntervals(covers, y0);
+
+  // 4) 被覆できた部分（target 内）
+  const union = mergeIntervals(covers);
+  drawCoveredOnTarget(union, sc.target, y0);
+
+  // 5) 未被覆部分
+  const uncov = subtractFromTarget(sc.target, union);
+  // 描画用に target の表示範囲でクリップ
+  const viewClip = uncov.map(([a,b]) => [
+    Math.max(a, S.view.xMin - 0.05*(S.view.xMax-S.view.xMin)),
+    Math.min(b, S.view.xMax + 0.05*(S.view.xMax-S.view.xMin))
+  ]).filter(([a,b]) => b > a + 1e-6);
+  drawUncovered(viewClip, y0);
+
+  // --- 表示更新 ---
+  document.getElementById('st-s').textContent = sc.name;
+  document.getElementById('r-N').textContent = covers.length;
+  // 被覆達成範囲（表示用）
+  if (union.length){
+    const lo = union[0][0], hi = union[union.length-1][1];
+    const isAll = (sc.target.kind === 'all');
+    document.getElementById('r-cov').textContent = `(${(+lo).toFixed(3)}, ${(+hi).toFixed(3)})`;
+  } else {
+    document.getElementById('r-cov').textContent = 'なし';
+  }
+  // 未被覆
+  // 「target に対する」未被覆。target=ℝ の場合は (−∞,−N]∪[N,∞) 表記、それ以外は数値で
+  if (uncov.length === 0){
+    document.getElementById('r-unc').innerHTML = '<span class="ok">なし (完全に被覆)</span>';
+  } else if (sc.target.kind === 'all'){
+    document.getElementById('r-unc').innerHTML = `<span class="bad">|x| ≥ ${N} (長さ ∞)</span>`;
+  } else {
+    let totLen = 0; for (const [a,b] of uncov) totLen += (b-a);
+    const detail = uncov.map(([a,b])=>`(${a.toFixed(4)},${b.toFixed(4)})`).join(' ∪ ');
+    document.getElementById('r-unc').innerHTML = `<span class="bad">${detail}</span> &nbsp;<span style="color:var(--muted)">(全長 ${totLen.toFixed(4)})</span>`;
+  }
+  // 判定
+  const v = document.getElementById('r-v');
+  const bar = document.getElementById('verdictBar');
+  if (uncov.length === 0){
+    v.innerHTML = '<span class="ok">この N で X を有限被覆できた</span>';
+  } else {
+    v.innerHTML = '<span class="bad">N=' + covers.length + ' では未被覆部分が残る</span>';
+  }
+  if (sc.verdictCompact){
+    bar.innerHTML = '<span style="color:var(--good)">✓ X はコンパクト</span>';
+  } else {
+    bar.innerHTML = '<span style="color:var(--bad)">✗ X はコンパクトでない</span>';
+  }
+  document.getElementById('note').textContent = sc.msg;
+}
+
+//---------------- アニメーション ----------------
+function tick(now){
+  if (S.auto){
+    const sc = SCN[S.scenarioKey];
+    if (sc.showN){
+      if (now - S.autoLast > 280){
+        S.autoLast = now;
+        S.N = S.N + 1;
+        if (S.N > sc.Nmax){ S.N = sc.Nmin; }
+        document.getElementById('N').value = String(S.N);
+        document.getElementById('N-v').textContent = String(S.N);
+        draw();
+      }
+    } else { S.auto = false; document.getElementById('auto').classList.remove('active'); document.getElementById('auto').textContent = '⏵ N を増やしてアニメ'; }
+  }
+  requestAnimationFrame(tick);
+}
+
+//---------------- UI ----------------
+function applyScenario(key){
+  S.scenarioKey = key;
+  const sc = SCN[key];
+  const nIn = document.getElementById('N');
+  if (sc.showN){
+    nIn.disabled = false;
+    nIn.min = sc.Nmin; nIn.max = sc.Nmax;
+    S.N = sc.Ndefault; nIn.value = String(S.N);
+    document.getElementById('N-v').textContent = String(S.N);
+  } else {
+    nIn.disabled = true;
+    document.getElementById('N-v').textContent = '—';
+  }
+  document.querySelectorAll('#scenarios button').forEach(b=>b.classList.toggle('active', b.dataset.key===key));
+  setViewFromScenario();
+}
+function bindUI(){
+  const grid = document.getElementById('scenarios');
+  for (const sc of SCENARIOS){
+    const b = document.createElement('button');
+    b.textContent = sc.name; b.dataset.key = sc.key;
+    if (sc.key === S.scenarioKey) b.classList.add('active');
+    b.addEventListener('click', ()=>applyScenario(sc.key));
+    grid.appendChild(b);
+  }
+  const nIn = document.getElementById('N');
+  nIn.addEventListener('input', ()=>{ S.N = parseInt(nIn.value); document.getElementById('N-v').textContent = String(S.N); draw(); });
+  document.getElementById('auto').addEventListener('click', (e)=>{
+    S.auto = !S.auto;
+    e.target.classList.toggle('active', S.auto);
+    e.target.textContent = S.auto ? '■ 停止' : '⏵ N を増やしてアニメ';
+    S.autoLast = performance.now();
+  });
+  window.addEventListener('resize', resize);
+}
+
+bindUI(); applyScenario('finite01'); requestAnimationFrame(tick);
+</script>
+</body>
+</html>
