@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>第6章 分離性 — 有限位相空間で T₀/T₁/T₂</title>
+<style>
+  :root { --bg:#0e1116; --panel:#161b22; --panel2:#1c232d; --border:#2a323d;
+          --text:#d6dde6; --muted:#8b97a6; --accent:#4ea1ff; --accent2:#ffb454;
+          --good:#5ad19a; --bad:#ef6a6a; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; height:100%; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; }
+  #app { display:flex; height:100vh; overflow:hidden; }
+  #stage { flex:1; position:relative; min-width:0; }
+  canvas { display:block; width:100%; height:100%; background:radial-gradient(circle at 50% 45%,#131a24 0%,#0e1116 72%); }
+  #sidebar { width:360px; flex:0 0 360px; background:var(--panel); border-left:1px solid var(--border);
+    overflow-y:auto; padding:14px 16px 40px; font-size:13px; }
+  h1 { font-size:15px; margin:0 0 2px; }
+  .nav { font-size:11px; margin:0 0 10px; }
+  .nav a { color:var(--accent); text-decoration:none; }
+  .nav a:hover { text-decoration:underline; }
+  .sub { color:var(--muted); font-size:11.5px; margin:0 0 12px; line-height:1.5; }
+  .group { background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:12px; }
+  .group h2 { font-size:12px; margin:0 0 10px; color:var(--accent); font-weight:600; }
+  .presetGrid { display:grid; grid-template-columns:1fr; gap:5px; }
+  .presetGrid button { background:#233040; color:var(--text); border:1px solid var(--border); border-radius:7px;
+    padding:7px 9px; font-size:12px; cursor:pointer; font-family:inherit; text-align:left; }
+  .presetGrid button:hover { background:#2c3c50; }
+  .presetGrid button.active { background:var(--accent); color:#05101e; border-color:var(--accent); font-weight:600; }
+  .axiomBox { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
+  .ax { padding:6px 8px; border-radius:7px; background:#0e1116; border:1px solid var(--border);
+        font-size:11.5px; text-align:center; }
+  .ax .lbl { color:var(--muted); display:block; font-size:10.5px; }
+  .ax.good { border-color:rgba(90,209,154,0.55); }
+  .ax.bad  { border-color:rgba(239,106,106,0.55); }
+  .ax .val.good { color:var(--good); font-weight:700; font-size:14px; }
+  .ax .val.bad  { color:var(--bad);  font-weight:700; font-size:14px; }
+  .res { font-size:12px; line-height:1.65; }
+  .res .row { display:flex; justify-content:space-between; gap:8px; }
+  .res .lbl { color:var(--muted); flex-shrink:0; }
+  .listBlock { background:#0e1116; padding:6px 8px; border-radius:6px; border:1px solid var(--border);
+               font-variant-numeric:tabular-nums; font-size:11.5px; max-height:130px; overflow:auto; }
+  .hint { color:var(--muted); font-size:11.5px; line-height:1.6; }
+  .hint b { color:var(--text); }
+  code { background:#0e1116; padding:1px 6px; border-radius:4px; color:var(--accent2); font-size:11.5px; }
+  #status { position:absolute; top:14px; left:16px; font-size:12px; color:var(--muted);
+    background:rgba(14,17,22,.7); padding:6px 10px; border-radius:8px; border:1px solid var(--border);
+    pointer-events:none; backdrop-filter:blur(4px); }
+  #status b { color:var(--accent2); }
+  #verdictBar { position:absolute; top:14px; right:16px; font-size:12.5px; font-weight:600;
+    background:rgba(14,17,22,.78); padding:7px 12px; border-radius:8px; border:1px solid var(--border);
+    pointer-events:none; backdrop-filter:blur(4px); }
+  #note { position:absolute; bottom:12px; left:16px; right:24px; max-width:760px;
+    font-size:12px; color:var(--text); background:rgba(14,17,22,.78); padding:8px 12px;
+    border-radius:8px; border:1px solid var(--border); pointer-events:none; line-height:1.55; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="status">プリセット: <b id="st-p">—</b></div>
+    <div id="verdictBar">—</div>
+    <div id="note">—</div>
+  </div>
+  <div id="sidebar">
+    <h1>第6章 分離性 — T₀/T₁/T₂ ほか</h1>
+    <p class="nav">▸ <a href="index.html">索引へ戻る</a></p>
+    <p class="sub">有限集合に位相 (=開集合の族) を入れたものを表示し、各種分離公理 (T₀ / T₁ / T₂ ハウスドルフ / 正則 / 正規) を自動判定します。点同士の「区別」のされ方も色つきの開集合「バブル」で可視化されます。</p>
+
+    <div class="group">
+      <h2>プリセット</h2>
+      <div class="presetGrid" id="presets"></div>
+    </div>
+
+    <div class="group">
+      <h2>判定 (この位相)</h2>
+      <div class="axiomBox">
+        <div class="ax" id="ax-T0"><span class="lbl">T₀</span><span class="val">—</span></div>
+        <div class="ax" id="ax-T1"><span class="lbl">T₁</span><span class="val">—</span></div>
+        <div class="ax" id="ax-T2"><span class="lbl">T₂ (Hausdorff)</span><span class="val">—</span></div>
+        <div class="ax" id="ax-T3"><span class="lbl">T₃ (正則 + T₁)</span><span class="val">—</span></div>
+        <div class="ax" id="ax-T4"><span class="lbl">T₄ (正規 + T₁)</span><span class="val">—</span></div>
+        <div class="ax" id="ax-fin"><span class="lbl">位相か?</span><span class="val">—</span></div>
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>位相 (開集合の族 𝒯)</h2>
+      <div class="listBlock" id="opensList">—</div>
+      <p class="hint" style="margin-top:6px"><b>閉集合</b>: 開集合の補集合 <br><span id="closedList" class="listBlock" style="display:block; margin-top:4px">—</span></p>
+      <p class="hint" style="margin-top:6px"><b>各点の閉包</b>: cl({x}) <br><span id="closuresList" class="listBlock" style="display:block; margin-top:4px">—</span></p>
+    </div>
+
+    <div class="group">
+      <h2>定義(復習)</h2>
+      <p class="hint"><b>T₀</b>: 任意の異なる 2 点 x,y に対し、片方を含むが他方を含まない開集合が存在。<br>
+      <b>T₁</b>: 任意の異なる x,y に対し x を含み y を含まない開集合が存在 (⇔ 単集合がすべて閉)。<br>
+      <b>T₂</b> (Hausdorff): 任意の異なる x,y を <b>互いに素な</b>2 つの開集合で分離できる。<br>
+      <b>T₃</b>: 任意の点と、それを含まない任意の閉集合を互いに素な開集合で分離 (+ T₁)。<br>
+      <b>T₄</b>: 任意の互いに素な 2 つの閉集合を互いに素な開集合で分離 (+ T₁)。</p>
+      <p class="hint" style="margin-top:6px">階層: T₄ ⇒ T₃ ⇒ T₂ ⇒ T₁ ⇒ T₀。</p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+//==================================================================
+// 第6章 分離性 — 有限位相空間ビジュアライザ
+//==================================================================
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+
+const S = {
+  presetKey: 'sierpinski',
+  layout: { positions: {}, R: 24 },     // 点ごとの (cx,cy)
+};
+
+//---------------- 集合演算ヘルパ (配列表現) ----------------
+// 点は文字列。集合は文字列ソート配列。
+function sortSet(s){ return Array.from(new Set(s)).sort(); }
+function eqSet(a, b){ if (a.length!==b.length) return false; for (let i=0;i<a.length;i++) if (a[i]!==b[i]) return false; return true; }
+function setIncludes(a, b){ return b.every(x=>a.includes(x)); }                  // a ⊇ b
+function intersect(a, b){ return a.filter(x=>b.includes(x)); }
+function union(a, b){ return sortSet([...a, ...b]); }
+function complement(a, X){ return X.filter(x=>!a.includes(x)); }
+function disjoint(a, b){ return intersect(a,b).length === 0; }
+function setKey(s){ return '{' + s.join(',') + '}'; }
+
+//---------------- プリセット ----------------
+// 各プリセット: { name, points: [...], opens: [[...], ...], note: '...' }
+const PRESETS = [
+  {
+    key:'discrete3', name:'離散位相 (3点) — 最も分離が強い',
+    points:['a','b','c'],
+    opens:[[],['a'],['b'],['c'],['a','b'],['a','c'],['b','c'],['a','b','c']],
+    note:'すべての部分集合が開。任意の単集合が開かつ閉なので、T₂(さらに T₃,T₄)。一般に離散位相は最強の分離性をもつ。'
+  },
+  {
+    key:'indiscrete3', name:'密着位相 (3点) — 最弱',
+    points:['a','b','c'],
+    opens:[[],['a','b','c']],
+    note:'開集合は ∅ と X のみ。どの 2 点も区別する開集合がないので T₀ ですらない。'
+  },
+  {
+    key:'sierpinski', name:'Sierpiński 空間 {0,1} — T₀ だが T₁ でない',
+    points:['0','1'],
+    opens:[[],['1'],['0','1']],
+    note:'開集合は ∅, {1}, X のみ。{1} が 0 を区別するので T₀。しかし 1 を含み 0 を含まない開集合だけがあり、その逆方向の分離ができないので T₁ ではない。代表的な「T₀ かつ T₁ でない」例。'
+  },
+  {
+    key:'chain3', name:'3点鎖位相 {∅, {a}, {a,b}, X} — T₀ だが T₁ でない',
+    points:['a','b','c'],
+    opens:[[],['a'],['a','b'],['a','b','c']],
+    note:'鎖状に伸びる位相。a < b < c の特殊化前順序を持つ。各 2 点はちょうど一方向に区別される (T₀)。しかし {a} を含まない b 単独の開集合がないので T₁ ではない。'
+  },
+  {
+    key:'particular', name:'特定点位相 (3点, 特定点 a) — T₀ だが T₁ でない',
+    points:['a','b','c'],
+    opens:[[],['a'],['a','b'],['a','c'],['a','b','c']],
+    note:'a を含む部分集合 + ∅。a は他の点と区別される (T₀) が、{b} を含み a を含まない開集合がないので T₁ ではない。'
+  },
+  {
+    key:'cofinite4', name:'共有限位相 (4点) — T₁ だが T₂ でない (有限版)',
+    points:['a','b','c','d'],
+    opens:(function(){
+      const X=['a','b','c','d']; const out=[[]];
+      // 補集合が有限(=任意)な集合 + ∅
+      // ここでは 4 点なので全部分集合とほぼ同じになるが、教科書的な例として
+      // ∅ と「単集合の補集合 (3点集合)」と X を中心に小さくする
+      // 真に T₁ かつ T₂ でない例には無限集合が必要 — ここでは「点の補集合のみ + ∅, X」の有限近似を示す
+      const co3=[['b','c','d'],['a','c','d'],['a','b','d'],['a','b','c']];
+      for (const s of co3) out.push(s);
+      // すべての 3点集合の対の和・積閉包（位相にするため）
+      // 単集合 = 3点集合の補集合の補集合をとると 4点集合の補集合は 0 点 (∅)。
+      // 開集合: ∅, 全 3 点集合(4個), 全 2 点集合(共通部分から生成), 単集合 (それらの共通部分), X
+      // これは結局離散位相になる → 教育上の有限 cofinite 例としては「離散と一致」と注釈
+      // 別の教科書的例として 4 点離散と本質的に同じになるため、シナリオ自体を「単集合がすべて閉だが小さい T₁ 例」と表示
+      // 単純に T₁ 例として: ∅, X, および全単集合の補集合
+      // ↑これだけだと位相にならないので、生成された位相を作る:
+      // 任意の有限交叉と任意の和をとる → 4 点の場合は離散位相になる
+      return [
+        [], ['a'], ['b'], ['c'], ['d'],
+        ['a','b'],['a','c'],['a','d'],['b','c'],['b','d'],['c','d'],
+        ['a','b','c'],['a','b','d'],['a','c','d'],['b','c','d'],
+        ['a','b','c','d']
+      ];
+    })(),
+    note:'有限集合上では「共有限位相」は実は離散位相と一致するので、ここでは離散位相 (4点) を表示しています。共有限位相が「T₁ だが T₂ でない」ことを示すには無限集合 (例: ℕ) が必要。'
+  },
+  {
+    key:'doublePt', name:'点列+極限の有限近似 — T₁ かどうか確認',
+    points:['p','q','r','s'],
+    opens:[
+      [],
+      ['p'],['q'],
+      ['p','q'],['p','q','r'],['p','q','s'],
+      ['p','q','r','s']
+    ],
+    note:'p, q は独立な「開」点。r, s は p,q を含む大きい開集合の中でしか分離されない。r も s も「自分だけを含む開集合」がない → T₁ ではない。'
+  },
+  {
+    key:'badInput', name:'(参考)位相になっていない例',
+    points:['a','b','c'],
+    opens:[[],['a','b'],['b','c'],['a','b','c']],
+    note:'これは位相ではない: {a,b} ∩ {b,c} = {b} が開集合の族に入っていない (有限交叉について閉でない)。判定欄の「位相か?」が ✗ になります。'
+  },
+];
+const PRESET = Object.fromEntries(PRESETS.map(p=>[p.key,p]));
+
+//---------------- 位相性のチェックと公理判定 ----------------
+function isTopology(X, opens){
+  // ∅ ∈ 𝒯, X ∈ 𝒯, 有限交叉, 任意和 (有限集合なので有限和でよい)
+  const has = (s) => opens.some(o => eqSet(o, s));
+  if (!has([])) return false;
+  if (!has(sortSet(X))) return false;
+  for (let i=0;i<opens.length;i++){
+    for (let j=i; j<opens.length;j++){
+      const u = sortSet(union(opens[i], opens[j]));
+      const v = sortSet(intersect(opens[i], opens[j]));
+      if (!has(u) || !has(v)) return false;
+    }
+  }
+  return true;
+}
+function openContains(opens, p){
+  return opens.filter(o => o.includes(p));
+}
+function closureOf(X, opens, A){
+  // 閉集合 = 開集合の補集合。A を含む閉集合の交叉
+  const closeds = opens.map(o => complement(o, X));
+  let res = sortSet(X);
+  for (const C of closeds){ if (setIncludes(C, A)) res = intersect(res, C); }
+  return sortSet(res);
+}
+function isT0(X, opens){
+  for (let i=0;i<X.length;i++) for (let j=i+1;j<X.length;j++){
+    const x=X[i], y=X[j];
+    const sep = opens.some(o => o.includes(x) !== o.includes(y));
+    if (!sep) return false;
+  }
+  return true;
+}
+function isT1(X, opens){
+  // 各 x について、{x} が閉 ⇔ X∖{x} が開
+  for (const x of X){
+    const c = X.filter(y=>y!==x);
+    const open = opens.some(o => eqSet(o, sortSet(c)));
+    if (!open) return false;
+  }
+  return true;
+}
+function isT2(X, opens){
+  for (let i=0;i<X.length;i++) for (let j=i+1;j<X.length;j++){
+    const x=X[i], y=X[j];
+    let ok = false;
+    for (const U of opens){ if (!U.includes(x) || U.includes(y)) continue;
+      for (const V of opens){ if (!V.includes(y) || V.includes(x)) continue;
+        if (disjoint(U,V)){ ok=true; break; }
+      }
+      if (ok) break;
+    }
+    if (!ok) return false;
+  }
+  return true;
+}
+function isRegular(X, opens){
+  // 任意の点 x と、x を含まない閉集合 C に対し、互いに素な開で分離
+  const closeds = opens.map(o => complement(o, X));
+  for (const x of X){
+    for (const C of closeds){
+      if (C.includes(x)) continue;
+      let ok = false;
+      for (const U of opens){ if (!U.includes(x)) continue;
+        for (const V of opens){ if (!setIncludes(V, C)) continue;
+          if (disjoint(U,V)){ ok=true; break; }
+        }
+        if (ok) break;
+      }
+      if (!ok) return false;
+    }
+  }
+  return true;
+}
+function isNormal(X, opens){
+  // 任意の互いに素な2つの閉集合を、互いに素な開で分離
+  const closeds = opens.map(o => complement(o, X));
+  for (let i=0;i<closeds.length;i++) for (let j=i+1;j<closeds.length;j++){
+    const A = closeds[i], B = closeds[j];
+    if (!disjoint(A, B)) continue;
+    let ok = false;
+    for (const U of opens){ if (!setIncludes(U, A)) continue;
+      for (const V of opens){ if (!setIncludes(V, B)) continue;
+        if (disjoint(U,V)){ ok=true; break; }
+      }
+      if (ok) break;
+    }
+    if (!ok) return false;
+  }
+  return true;
+}
+
+//---------------- ビュー ----------------
+function resize(){
+  const r = cv.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio||1;
+  cv.width = Math.floor(r.width*dpr); cv.height = Math.floor(r.height*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  layoutPoints();
+  draw();
+}
+function layoutPoints(){
+  const r = cv.parentElement.getBoundingClientRect();
+  const p = PRESET[S.presetKey]; if (!p) return;
+  const n = p.points.length;
+  const cx = r.width * 0.42, cy = r.height * 0.42;
+  const R = Math.min(r.width, r.height) * 0.22;
+  S.layout.positions = {};
+  if (n === 2){
+    S.layout.positions[p.points[0]] = [cx - R*0.7, cy];
+    S.layout.positions[p.points[1]] = [cx + R*0.7, cy];
+  } else {
+    for (let i=0;i<n;i++){
+      const th = -Math.PI/2 + 2*Math.PI*i/n;
+      S.layout.positions[p.points[i]] = [cx + R*Math.cos(th), cy + R*Math.sin(th)];
+    }
+  }
+  S.layout.R = 28;
+}
+
+//---------------- 描画 ----------------
+function hsl(i, n, l=58, s=72){ return `hsl(${(i*137 + 30) % 360},${s}%,${l}%)`; }
+
+function drawOpenBubble(set, color, alpha){
+  // set 内の各点を囲むようなぼかし曲線(円の合成)
+  if (set.length === 0) return;   // ∅ は描かない
+  ctx.fillStyle = color.replace(')', `,${alpha})`).replace('hsl','hsla');
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.6;
+  // 各点を中心とした大きめの円を fill — 合成で「バブル」状に見せる
+  const r = S.layout.R + 18;
+  ctx.beginPath();
+  for (const p of set){
+    const [x,y] = S.layout.positions[p];
+    ctx.moveTo(x+r, y);
+    ctx.arc(x,y, r, 0, 2*Math.PI);
+  }
+  ctx.fill();
+  // 境界線(各点を囲む円の和) — 簡易にバブル輪郭は省略してもよい
+}
+
+function draw(){
+  const r = cv.parentElement.getBoundingClientRect();
+  ctx.clearRect(0,0,r.width,r.height);
+  const p = PRESET[S.presetKey]; if (!p) return;
+
+  // バブル: 開集合 (∅, X は除く) を半透明で重ね描き
+  ctx.globalCompositeOperation = 'screen';
+  let idx = 0;
+  const skip = (s) => s.length === 0 || s.length === p.points.length;
+  for (const o of p.opens){
+    if (skip(o)) { continue; }
+    drawOpenBubble(o, hsl(idx, p.opens.length), 0.16);
+    idx++;
+  }
+  ctx.globalCompositeOperation = 'source-over';
+
+  // 点
+  for (const pt of p.points){
+    const [x,y] = S.layout.positions[pt];
+    ctx.fillStyle = '#0e1116'; ctx.beginPath(); ctx.arc(x,y, S.layout.R, 0, 2*Math.PI); ctx.fill();
+    ctx.strokeStyle = '#cfe0f4'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#cfe0f4'; ctx.font = '16px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(pt, x, y);
+  }
+
+  // タイトル
+  document.getElementById('st-p').textContent = p.name;
+
+  // 判定計算
+  const X = sortSet(p.points);
+  const opens = p.opens.map(o => sortSet(o));
+  const isTop = isTopology(X, opens);
+  let res = {T0:false,T1:false,T2:false,T3:false,T4:false,top:isTop};
+  if (isTop){
+    res.T0 = isT0(X, opens);
+    res.T1 = isT1(X, opens);
+    res.T2 = isT2(X, opens);
+    res.T3 = res.T1 && isRegular(X, opens);
+    res.T4 = res.T1 && isNormal(X, opens);
+  }
+  setAx('ax-fin', res.top, res.top?'✓ 位相':'✗ 位相でない');
+  setAx('ax-T0',  res.T0, res.T0?'✓':'✗');
+  setAx('ax-T1',  res.T1, res.T1?'✓':'✗');
+  setAx('ax-T2',  res.T2, res.T2?'✓':'✗');
+  setAx('ax-T3',  res.T3, res.T3?'✓':'✗');
+  setAx('ax-T4',  res.T4, res.T4?'✓':'✗');
+
+  // 開集合/閉集合/閉包 リスト表示
+  document.getElementById('opensList').innerHTML = '𝒯 = { ' +
+    opens.map(o => o.length===0?'∅':(o.length===X.length?'X={'+X.join(',')+'}':'{'+o.join(',')+'}')).join(',  ') + ' }';
+  const closeds = opens.map(o => sortSet(complement(o, X)));
+  document.getElementById('closedList').innerHTML = '{ ' +
+    closeds.map(c => c.length===0?'∅':(c.length===X.length?'X':'{'+c.join(',')+'}')).join(',  ') + ' }';
+  const closures = X.map(pt => 'cl({'+pt+'}) = {'+closureOf(X, opens, [pt]).join(',')+'}');
+  document.getElementById('closuresList').innerHTML = closures.join('<br>');
+
+  // バナー
+  const bar = document.getElementById('verdictBar');
+  if (!res.top) bar.innerHTML = '<span style="color:var(--bad)">✗ これは位相ではない</span>';
+  else if (res.T2) bar.innerHTML = '<span style="color:var(--good)">✓ ハウスドルフ (T₂)</span>';
+  else if (res.T1) bar.innerHTML = '<span style="color:var(--accent2)">⚠ T₁ だが T₂ でない</span>';
+  else if (res.T0) bar.innerHTML = '<span style="color:var(--accent2)">⚠ T₀ だが T₁ でない</span>';
+  else bar.innerHTML = '<span style="color:var(--bad)">✗ T₀ ですらない</span>';
+
+  document.getElementById('note').textContent = p.note;
+}
+function setAx(id, ok, text){
+  const el = document.getElementById(id);
+  el.classList.remove('good','bad'); el.classList.add(ok?'good':'bad');
+  const v = el.querySelector('.val');
+  v.classList.remove('good','bad'); v.classList.add(ok?'good':'bad');
+  v.textContent = text;
+}
+
+//---------------- UI ----------------
+function bindUI(){
+  const grid = document.getElementById('presets');
+  for (const p of PRESETS){
+    const b = document.createElement('button');
+    b.textContent = p.name; b.dataset.key = p.key;
+    if (p.key === S.presetKey) b.classList.add('active');
+    b.addEventListener('click', ()=>{
+      S.presetKey = p.key;
+      grid.querySelectorAll('button').forEach(x=>x.classList.toggle('active', x.dataset.key===p.key));
+      layoutPoints(); draw();
+    });
+    grid.appendChild(b);
+  }
+  window.addEventListener('resize', resize);
+}
+
+bindUI(); resize();
+</script>
+</body>
+</html>
